@@ -1,0 +1,6 @@
+/node_modules
+/.shadow-cljs/
+/.expo/
+/app/
+/.cpcache/
+*.DS_Store

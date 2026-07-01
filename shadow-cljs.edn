@@ -1,0 +1,11 @@
+{:source-paths ["src/main"
+                "src/test"]
+
+ :dependencies [[reagent "2.0.1"]
+                [re-frame "1.4.7"]]
+
+ :builds       {:app {:target           :react-native
+                      :init-fn          example.app/init
+                      :output-dir       "app"
+                      :compiler-options {:infer-externs :auto}
+                      :devtools         {:autoload true}}}}
