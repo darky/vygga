@@ -64,6 +64,57 @@ Use `printf` or echo with newlines:
 printf '(let [x 42]\n  (js/alert (str "The answer is " x)))' | bb scripts/nrepl_eval.clj
 ```
 
+## Yggdrasil Network (yggstack Native Module)
+
+The app embeds [yggstack](https://github.com/DrewCyber/yggstack) via gomobile JNI bindings for Yggdrasil network access.
+
+### Stack
+- **Go** — `vendor/yggstack/mobile/yggstack.go` (gomobile bindings)
+- **AAR** — `vendor/yggstack/android-build/yggstack.aar` (built via `./mobile/build-android.sh`)
+- **Config Plugin** — `plugins/withYggstack.js` (copies AAR + registers native module at prebuild)
+- **Java Module** — `YggstackModule.java` (exposes Go methods to React Native JS)
+- **CLJS Bridge** — `example.yggstack` (re-frame events/subs wrapping native module)
+
+### First-time Setup (dev build)
+
+```bash
+# Build AAR (if not already done)
+cd vendor/yggstack && ANDROID_HOME=$HOME/Library/Android/sdk ./mobile/build-android.sh
+
+# Generate native Android project + run config plugin
+npx expo prebuild
+
+# Build and install dev build on device
+npx expo run:android
+```
+
+After this, the normal CLJS workflow (shadow-cljs watch + nREPL) continues to work.
+
+### Yggdrasil REPL commands
+
+```bash
+# Check connection status
+echo '@(re-frame.core/subscribe [:yggstack/status])' | bb scripts/nrepl_eval.clj
+
+# Check peer count
+echo '@(re-frame.core/subscribe [:yggstack/peer-count])' | bb scripts/nrepl_eval.clj
+
+# Check IPv6 address
+echo '@(re-frame.core/subscribe [:yggstack/address])' | bb scripts/nrepl_eval.clj
+
+# Start Yggdrasil
+echo '(re-frame.core/dispatch [:yggstack/start])' | bb scripts/nrepl_eval.clj
+
+# Stop Yggdrasil
+echo '(re-frame.core/dispatch [:yggstack/stop])' | bb scripts/nrepl_eval.clj
+
+# Add a peer
+echo '(re-frame.core/dispatch [:yggstack/add-peer "tls://example.com:443"])' | bb scripts/nrepl_eval.clj
+
+# Remove a peer
+echo '(re-frame.core/dispatch [:yggstack/remove-peer "tls://example.com:443"])' | bb scripts/nrepl_eval.clj
+```
+
 ## Troubleshooting
 
 | Symptom | Likely Cause |

@@ -4,7 +4,6 @@
     "slug": "reagent-expo",
     "privacy": "public",
     "platforms": [
-      "ios",
       "android",
       "web"
     ],
@@ -23,7 +22,14 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.reagentexpo"
+    },
+    "plugins": [
+      "./plugins/withYggstack"
+    ],
+    "android": {
+      "package": "com.anonymous.reagentexpo"
     }
   }
 }
