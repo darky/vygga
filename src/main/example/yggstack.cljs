@@ -50,6 +50,15 @@
   (let [parsed (try (js/JSON.parse config-json) (catch js/Error _ nil))]
     (when parsed (.-PrivateKey parsed))))
 
+(defn add-remote-tcp-mapping [port local-addr]
+  (.addRemoteTCPMapping native-module port local-addr))
+
+(defn remove-remote-tcp-mapping [port local-addr]
+  (.removeRemoteTCPMapping native-module port local-addr))
+
+(defn clear-remote-mappings []
+  (.clearRemoteMappings native-module))
+
 (defn build-config-json [private-key peers]
   (let [peers-str (if (seq peers)
                     (str "[" (str/join ", " (map #(str "\"" % "\"") peers)) "]")

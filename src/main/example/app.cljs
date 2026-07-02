@@ -73,7 +73,10 @@
         "Tap me, I'll navigate"]
        [button {:on-press (fn [] (-> props .-navigation (.navigate "Settings")))
                 :style {:margin-top 10}}
-        "Yggdrasil Settings"]]
+        "Yggdrasil Settings"]
+       [button {:on-press (fn [] (-> props .-navigation (.navigate "Contacts")))
+                :style {:margin-top 10 :background-color "#5C6BC0"}}
+        "Messenger"]]
       [:> rn/View
        [:> rn/View {:style {:flex-direction :row :align-items :center :margin-bottom 20}}
         [:> rn/Image {:style {:width 160 :height 160} :source cljs-splash}]
@@ -165,6 +168,178 @@
 
      [:> StatusBar {:style "auto"}]]))
 
+;; ---- Contact List Screen ----
+
+(defn- contact-item [^js props contact-id {:keys [name address messages]}]
+  (let [last-msg (last messages)
+        preview (if last-msg (:text last-msg) "")]
+    [:> rn/TouchableOpacity
+     {:key contact-id
+      :style {:flex-direction :row :align-items :center
+              :padding 14 :border-bottom-width 1
+              :border-bottom-color "#f0f0f0"}
+      :on-press #(do
+                   (rf/dispatch [:messenger/set-current-contact contact-id])
+                   (-> props .-navigation (.navigate "Chat")))}
+     [:> rn/View {:style {:width 44 :height 44 :border-radius 22
+                          :background-color :blue :justify-content :center
+                          :align-items :center :margin-right 12}}
+      [:> rn/Text {:style {:color :white :font-size 18 :font-weight :bold}}
+       (-> name .charAt (.toUpperCase))]]
+     [:> rn/View {:style {:flex 1}}
+      [:> rn/Text {:style {:font-size 16 :font-weight :600}} name]
+      (when (seq preview)
+        [:> rn/Text {:style {:font-size 13 :color "#999" :margin-top 2}
+                     :number-of-lines 1} preview])]
+     [:> rn/Text {:style {:font-size 11 :color "#ccc"}} address]]))
+
+(defn- contacts [props]
+  (r/with-let [contacts-map (rf/subscribe [:messenger/contacts])
+               server-running (rf/subscribe [:messenger/server-running])
+               *show-add (r/atom false)
+               *new-name (r/atom "")
+               *new-addr (r/atom "")]
+    [:> rn/View {:style {:flex 1 :background-color :white}}
+     ;; Server status bar
+     [:> rn/View {:style {:flex-direction :row :align-items :center
+                          :justify-content :space-between
+                          :padding-horizontal 16 :padding-vertical 10
+                          :background-color (str (if @server-running "#4CAF50" "#F44336") "10")
+                          :border-bottom-width 1 :border-bottom-color "#e0e0e0"}}
+      [:> rn/View {:style {:flex-direction :row :align-items :center}}
+       [:> rn/View {:style {:width 10 :height 10 :border-radius 5
+                            :background-color (if @server-running "#4CAF50" "#F44336")
+                            :margin-right 8}}]
+       [:> rn/Text {:style {:font-size 14 :font-weight :500
+                            :color (if @server-running "#4CAF50" "#F44336")}}
+        (if @server-running "Messenger Online" "Messenger Offline")]]
+      [:> rn/Pressable {:on-press #(if @server-running
+                                     (rf/dispatch [:messenger/stop-server])
+                                     (rf/dispatch [:messenger/start-server]))
+                        :style {:padding-horizontal 12 :padding-vertical 4
+                                :border-radius 12 :border-width 1
+                                :border-color (if @server-running "#F44336" "#4CAF50")}}
+       [:> rn/Text {:style {:font-size 12 :color (if @server-running "#F44336" "#4CAF50")}}
+        (if @server-running "Stop" "Start")]]]
+     ;; Contact list
+     [:> rn/ScrollView {:style {:flex 1}}
+      (let [sorted (sort-by (fn [[_ c]] (:name c)) (vec @contacts-map))]
+        (if (empty? sorted)
+          [:> rn/View {:style {:padding 40 :align-items :center}}
+           [:> rn/Text {:style {:font-size 16 :color "#999"}}
+            "No contacts yet"]]
+          (doall
+            (for [[cid c] sorted]
+              ^{:key cid} [contact-item props cid c]))))]
+     ;; FAB to add contact
+     [:> rn/Pressable {:style {:position :absolute :bottom 20 :right 20
+                               :width 56 :height 56 :border-radius 28
+                               :background-color :blue :justify-content :center
+                               :align-items :center :elevation 4}
+                       :on-press #(reset! *show-add true)}
+      [:> rn/Text {:style {:color :white :font-size 28}} "+"]]
+     ;; Add contact dialog
+     (when @*show-add
+       [:> rn/View {:style {:position :absolute :top 0 :left 0 :right 0 :bottom 0
+                            :background-color "rgba(0,0,0,0.5)"
+                            :justify-content :center :align-items :center}}
+        [:> rn/View {:style {:background-color :white :border-radius 16
+                             :padding 24 :width "85%"}}
+         [:> rn/Text {:style {:font-size 20 :font-weight :bold :margin-bottom 16}}
+          "Add Contact"]
+         [:> rn/TextInput {:style {:border-width 1 :border-color "#ddd"
+                                   :border-radius 8 :padding 12 :font-size 15
+                                   :margin-bottom 12}
+                           :placeholder "Display name"
+                           :value @*new-name
+                           :on-change-text #(reset! *new-name %)}]
+         [:> rn/TextInput {:style {:border-width 1 :border-color "#ddd"
+                                   :border-radius 8 :padding 12 :font-size 15
+                                   :margin-bottom 20}
+                           :placeholder "Yggdrasil IPv6 (e.g. 201:1234::1)"
+                           :value @*new-addr
+                           :on-change-text #(reset! *new-addr %)}]
+         [:> rn/View {:style {:flex-direction :row :justify-content :flex-end}}
+          [:> rn/Pressable {:on-press #(reset! *show-add false)
+                            :style {:padding-horizontal 16 :padding-vertical 10
+                                    :margin-right 12}}
+           [:> rn/Text {:style {:font-size 15 :color "#999"}} "Cancel"]]
+          [:> rn/Pressable {:style {:background-color :blue :padding-horizontal 20
+                                    :padding-vertical 10 :border-radius 8}
+                            :on-press (fn []
+                                        (let [name @*new-name addr @*new-addr]
+                                          (when (and (seq name) (seq addr))
+                                            (rf/dispatch [:messenger/add-contact
+                                                          {:name name :address addr}]))
+                                          (reset! *new-name "")
+                                          (reset! *new-addr "")
+                                          (reset! *show-add false)))}
+            [:> rn/Text {:style {:color :white :font-weight :600}} "Add"]]]]])
+     [:> StatusBar {:style "auto"}]]))
+;; ---- Chat Screen ----
+
+(defn- chat []
+  (r/with-let [current-id (rf/subscribe [:messenger/current-contact])
+               contacts (rf/subscribe [:messenger/contacts])
+               *text (r/atom "")
+               *scroll-ref (r/atom nil)]
+    (let [cid @current-id
+          c (get @contacts cid)
+          msgs (:messages c [])]
+      [:> rn/View {:style {:flex 1 :background-color :white}}
+       ;; Header
+       [:> rn/View {:style {:padding-horizontal 16 :padding-vertical 12
+                            :border-bottom-width 1 :border-bottom-color "#e0e0e0"
+                            :flex-direction :row :align-items :center}}
+        [:> rn/Text {:style {:font-size 17 :font-weight :600 :flex 1}}
+         (or (:name c) "Unknown")]
+        [:> rn/Text {:style {:font-size 12 :color "#999"}} (:address c)]]
+       ;; Messages
+       [:> rn/ScrollView {:style {:flex 1 :padding 12}
+                          :ref #(reset! *scroll-ref %)
+                          :on-content-size-change (fn []
+                            (when-let [s @*scroll-ref]
+                              (try (.scrollToEnd s #js {:animated false})
+                                   (catch js/Error _))))}
+        (if (empty? msgs)
+          [:> rn/View {:style {:padding 40 :align-items :center}}
+           [:> rn/Text {:style {:font-size 15 :color "#999"}}
+            "No messages yet"]]
+          (doall
+            (for [{:keys [text from-me id ts]} msgs]
+              [:> rn/View {:key id
+                           :style {:align-items (if from-me :flex-end :flex-start)
+                                   :margin-bottom 8}}
+               [:> rn/View {:style {:max-width "75%"
+                                    :background-color (if from-me "#007AFF" "#E8E8E8")
+                                    :border-radius 16 :padding 12}}
+                [:> rn/Text {:style {:font-size 15
+                                     :color (if from-me :white "#333")}}
+                 text]]])))]
+       ;; Input bar
+       [:> rn/View {:style {:flex-direction :row :align-items :center
+                            :padding 12 :border-top-width 1
+                            :border-top-color "#e0e0e0"}}
+        [:> rn/TextInput {:style {:flex 1 :border-width 1 :border-color "#ddd"
+                                  :border-radius 20 :padding-horizontal 16
+                                  :padding-vertical 8 :font-size 15 :margin-right 8}
+                          :placeholder "Type a message..."
+                          :value @*text
+                          :on-change-text #(reset! *text %)
+                          :on-submit-editing #(when (seq @*text)
+                                                (rf/dispatch [:messenger/send-message cid @*text])
+                                                (reset! *text ""))}]
+        [:> rn/Pressable {:style {:width 40 :height 40 :border-radius 20
+                                  :background-color :blue :justify-content :center
+                                  :align-items :center}
+                          :on-press (fn []
+                                      (let [t @*text]
+                                        (when (seq t)
+                                          (rf/dispatch [:messenger/send-message cid t])
+                                          (reset! *text ""))))}
+         [:> rn/Text {:style {:color :white :font-size 18}} "➤"]]]
+       [:> StatusBar {:style "auto"}]])))
+
 (defn root []
   (r/with-let [!root-state (rf/subscribe [:navigation/root-state])
                save-root-state! (fn [^js state]
@@ -183,7 +358,13 @@
                         :options {:title "About"}}]
       [:> Stack.Screen {:name "Settings"
                         :component (fn [props] (r/as-element [settings props]))
-                        :options {:title "Yggdrasil Settings"}}]]]))
+                        :options {:title "Yggdrasil Settings"}}]
+      [:> Stack.Screen {:name "Contacts"
+                        :component (fn [props] (r/as-element [contacts props]))
+                        :options {:title "Messenger"}}]
+      [:> Stack.Screen {:name "Chat"
+                        :component (fn [props] (r/as-element [chat props]))
+                        :options {:title "Chat"}}]]]))
 
 (defn start
   {:dev/after-load true}

@@ -14,4 +14,8 @@
                             :address nil
                             :public-key nil
                             :private-key nil
-                            :logs []}})
+                            :logs []}
+                 :messenger {:server-port 7777
+                             :server-running false
+                             :contacts {}
+                             :current-contact nil}})

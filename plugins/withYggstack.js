@@ -133,6 +133,13 @@ import link.yggdrasil.yggstack.mobile.LogCallback;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -143,6 +150,8 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   private Yggstack instance;
   private ScheduledExecutorService scheduler;
   private boolean running = false;
+  private ServerSocket messengerServer;
+  private Thread messengerThread;
 
   YggstackModule(ReactApplicationContext context) {
     super(context);
@@ -322,12 +331,150 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     return m;
   }
 
-  private void sendEvent(String eventName, Object data) {
+   private void sendEvent(String eventName, Object data) {
     if (getReactApplicationContext().hasActiveReactInstance()) {
       getReactApplicationContext()
         .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
         .emit(eventName, data);
     }
+  }
+
+  private void readFully(InputStream in, byte[] buffer) throws Exception {
+    int offset = 0;
+    while (offset < buffer.length) {
+      int read = in.read(buffer, offset, buffer.length - offset);
+      if (read < 0) throw new Exception("Connection closed");
+      offset += read;
+    }
+  }
+
+  @ReactMethod
+  public void sendMessage(String targetAddr, String message, Promise promise) {
+    new Thread(() -> {
+      try {
+        Socket socket = new Socket("127.0.0.1", 1080);
+        socket.setSoTimeout(10000);
+        OutputStream out = socket.getOutputStream();
+        InputStream in = socket.getInputStream();
+
+        out.write(new byte[]{0x05, 0x01, 0x00});
+        byte[] handshakeResp = new byte[2];
+        readFully(in, handshakeResp);
+        if (handshakeResp[0] != 0x05 || handshakeResp[1] != 0x00) {
+          throw new Exception("SOCKS5 handshake failed");
+        }
+
+        int port = 7777;
+        String ip = targetAddr.replace("[", "").replace("]", "");
+        InetAddress addr = InetAddress.getByName(ip);
+        byte[] addrBytes = addr.getAddress();
+
+        byte[] connectReq = new byte[addrBytes.length + 6];
+        connectReq[0] = 0x05;
+        connectReq[1] = 0x01;
+        connectReq[2] = 0x00;
+        connectReq[3] = addrBytes.length == 16 ? (byte) 0x04 : (byte) 0x01;
+        System.arraycopy(addrBytes, 0, connectReq, 4, addrBytes.length);
+        connectReq[connectReq.length - 2] = (byte) ((port >> 8) & 0xFF);
+        connectReq[connectReq.length - 1] = (byte) (port & 0xFF);
+        out.write(connectReq);
+
+        byte[] connectResp = new byte[10];
+        readFully(in, connectResp);
+        if (connectResp[0] != 0x05 || connectResp[1] != 0x00) {
+          throw new Exception("SOCKS5 connect failed, status: " + connectResp[1]);
+        }
+
+        byte[] msgBytes = (message + (char) 10).getBytes("UTF-8");
+        out.write(msgBytes);
+        out.flush();
+        socket.close();
+        promise.resolve(true);
+      } catch (Exception e) {
+        promise.reject("SEND_MESSAGE_ERROR", e.getMessage(), e);
+      }
+    }).start();
+  }
+
+  @ReactMethod
+  public void addRemoteTCPMapping(int remotePort, String localAddr, Promise promise) {
+    try {
+      if (instance != null) {
+        instance.addRemoteTCPMapping(remotePort, localAddr);
+      }
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_REMOTE_MAP_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
+  public void removeRemoteTCPMapping(int remotePort, String localAddr, Promise promise) {
+    try {
+      if (instance != null) {
+        instance.removeRemoteTCPMapping(remotePort, localAddr);
+      }
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_REMOVE_REMOTE_MAP_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
+  public void clearRemoteMappings(Promise promise) {
+    try {
+      if (instance != null) {
+        instance.clearRemoteMappings();
+      }
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_CLEAR_REMOTE_MAP_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
+  public void startMessengerServer(int port, Promise promise) {
+    if (messengerServer != null) {
+      promise.resolve(true);
+      return;
+    }
+    messengerThread = new Thread(() -> {
+      try {
+        messengerServer = new ServerSocket(port, 50, InetAddress.getByName("127.0.0.1"));
+        Log.i(TAG, "Messenger server listening on " + port);
+        promise.resolve(true);
+        while (!messengerServer.isClosed()) {
+          Socket client = messengerServer.accept();
+          new Thread(() -> {
+            try {
+              BufferedReader reader = new BufferedReader(
+                new InputStreamReader(client.getInputStream(), "UTF-8"));
+              String line;
+              while ((line = reader.readLine()) != null) {
+                sendEvent("onMessengerMessage", line);
+              }
+              client.close();
+            } catch (Exception ignored) {}
+          }).start();
+        }
+      } catch (Exception e) {
+        Log.e(TAG, "Messenger server error", e);
+        promise.reject("START_SERVER_ERROR", e.getMessage(), e);
+      }
+    });
+    messengerThread.start();
+  }
+
+  @ReactMethod
+  public void stopMessengerServer(Promise promise) {
+    try {
+      if (messengerServer != null && !messengerServer.isClosed()) {
+        messengerServer.close();
+      }
+    } catch (Exception ignored) {}
+    messengerServer = null;
+    messengerThread = null;
+    promise.resolve(true);
   }
 
   @ReactMethod
@@ -345,16 +492,17 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     try {
       if (instance != null) instance.stop();
     } catch (Exception ignored) {}
+    try {
+      if (messengerServer != null && !messengerServer.isClosed()) messengerServer.close();
+    } catch (Exception ignored) {}
     running = false;
     if (scheduler != null) scheduler.shutdown();
   }
 }
 `;
       const moduleFile = path.join(srcDir, 'YggstackModule.java');
-      if (!fs.existsSync(moduleFile)) {
-        fs.writeFileSync(moduleFile, moduleCode, 'utf8');
-        console.log('[withYggstack] Created YggstackModule.java');
-      }
+      fs.writeFileSync(moduleFile, moduleCode, 'utf8');
+      console.log('[withYggstack] Created YggstackModule.java');
 
       const packageCode = `package ${YGGSTACK_PACKAGE};
 

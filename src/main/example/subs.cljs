@@ -47,3 +47,25 @@
  :yggstack/public-key
  (fn [db _]
    (get-in db [:yggstack :public-key])))
+
+;; ---- Messenger subscriptions ----
+
+(rf/reg-sub
+ :messenger/contacts
+ (fn [db _]
+   (get-in db [:messenger :contacts])))
+
+(rf/reg-sub
+ :messenger/contact
+ (fn [db [_ id]]
+   (get-in db [:messenger :contacts id])))
+
+(rf/reg-sub
+ :messenger/server-running
+ (fn [db _]
+   (get-in db [:messenger :server-running])))
+
+(rf/reg-sub
+ :messenger/current-contact
+ (fn [db _]
+   (get-in db [:messenger :current-contact])))
