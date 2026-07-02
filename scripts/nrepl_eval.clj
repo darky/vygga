@@ -81,22 +81,34 @@
                               (catch Exception _ nil))
                          clojure.string/trim
                          parse-long)
-                 7888)
+                  7888)
         code (slurp *in*)
         sock (Socket. "localhost" port)
         is   (PushbackInputStream. (.getInputStream sock))
         os   (.getOutputStream sock)]
     (try
       (let [clone-resp (nrepl-send is os {:op "clone"})
-            session (get clone-resp "new-session")]
-        (nrepl-eval is os session "(shadow/nrepl-select :app)")
-        (let [res (nrepl-eval is os session code)]
-          (when-not (clojure.string/blank? (:out res))
-            (print (:out res)))
-          (when-not (clojure.string/blank? (:err res))
-            (binding [*out* *err*] (println (:err res))))
-          (when-not (clojure.string/blank? (:value res))
-            (println (:value res)))))
+            session    (get clone-resp "new-session")
+            list?      (System/getenv "LIST_RUNTIMES")
+            rt-id      (System/getenv "RUNTIME_ID")]
+        (if list?
+          (let [res (nrepl-eval is os session
+                       "(shadow.cljs.devtools.api/repl-runtimes :app)")]
+            (println (:value res)))
+          (do
+            (nrepl-eval is os session
+              (str "(shadow/nrepl-select :app"
+                   (if rt-id
+                     (str " {:runtime-id \"" rt-id "\"}")
+                     "")
+                   ")"))
+            (let [res (nrepl-eval is os session code)]
+              (when-not (clojure.string/blank? (:out res))
+                (print (:out res)))
+              (when-not (clojure.string/blank? (:err res))
+                (binding [*out* *err*] (println (:err res))))
+              (when-not (clojure.string/blank? (:value res))
+                (println (:value res)))))))
       (finally
         (.close sock)))))
 

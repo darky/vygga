@@ -115,6 +115,57 @@ echo '(re-frame.core/dispatch [:yggstack/add-peer "tls://example.com:443"])' | b
 echo '(re-frame.core/dispatch [:yggstack/remove-peer "tls://example.com:443"])' | bb scripts/nrepl_eval.clj
 ```
 
+## Multi-Device Workflow (2 Android phones)
+
+The eval script supports targeting specific devices via environment variables.
+
+### List connected runtimes
+
+```bash
+LIST_RUNTIMES=true bb scripts/nrepl_eval.clj
+# => [{:client-id "aaa-111..." :host :react-native :build-id :app ...}
+#     {:client-id "bbb-222..." :host :react-native :build-id :app ...}]
+```
+
+Each connected device appears as a map with a `:client-id` — the handle used for targeting.
+
+### Target a specific device
+
+```bash
+RUNTIME_ID=aaa-111... echo '(js/alert "Hello from device 1")' | bb scripts/nrepl_eval.clj
+```
+
+### Daily workflow
+
+```bash
+# 0. Build native APK (once, or after native changes)
+npx expo run:android                                         # installs on first device
+adb -s <serial2> install -r android/app/build/outputs/apk/debug/app-debug.apk   # second device
+
+# 1. Start shadow-cljs watch (stays running)
+npx shadow-cljs watch app
+
+# 2. Launch the app on both phones (tap the app icon)
+
+# 3. List connected runtimes
+LIST_RUNTIMES=true bb scripts/nrepl_eval.clj
+# Note both client-ids from the output
+
+# 4. Terminal A — targets device 1
+RUNTIME_ID=aaa-111... echo '@(re-frame.core/subscribe [:yggstack/status])' | bb scripts/nrepl_eval.clj
+
+# 5. Terminal B — targets device 2
+RUNTIME_ID=bbb-222... echo '@(re-frame.core/subscribe [:yggstack/status])' | bb scripts/nrepl_eval.clj
+
+# 6. After hot reload / app restart, client-ids change — re-list and update terminals
+```
+
+### Multiple eval on same device in one go
+
+```bash
+RUNTIME_ID=aaa-111... printf '(inc 1)\n(inc 2)' | bb scripts/nrepl_eval.clj
+```
+
 ## Troubleshooting
 
 | Symptom | Likely Cause |
@@ -123,3 +174,5 @@ echo '(re-frame.core/dispatch [:yggstack/remove-peer "tls://example.com:443"])' 
 | Connection refused | nREPL server not started yet |
 | `No such namespace: js` | CLJS session not established (shadow build not running) |
 | Timeout / no response | App not loaded on device/emulator yet |
+| `LIST_RUNTIMES` returns empty vector | No devices connected yet — launch the app on each phone |
+| `RUNTIME_ID` eval returns stale result | Device client-id changed after hot reload — re-list and update |
