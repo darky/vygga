@@ -3,12 +3,14 @@
    [re-frame.core :as rf]
    [example.yggstack :as ygg]
    [example.messenger :as msg]
+   [example.storage :as storage]
    [example.db :as db :refer [app-db]]))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :initialize-db
  (fn [_ _]
-   app-db))
+   {:db app-db
+    :yggstack/load-and-start nil}))
 
 (rf/reg-event-db
  :inc-counter
@@ -42,10 +44,47 @@
    (-> (ygg/generate-config)
        (.then (fn [config-json]
                 (let [key (ygg/extract-private-key config-json)]
+                  (storage/save-key! key)
                   (rf/dispatch-sync [:yggstack/set-private-key key])
                   (rf/dispatch [:yggstack/start]))))
        (.catch (fn [e]
                  (js/console.error "keygen error:" e)
+                 (rf/dispatch [:yggstack/set-status :error]))))))
+
+(rf/reg-fx
+ :yggstack/load-and-start
+ (fn [_]
+   (-> (storage/load-key)
+       (.then (fn [key]
+                (when key
+                  (rf/dispatch-sync [:yggstack/set-private-key key]))
+                (rf/dispatch [:yggstack/start])))
+       (.catch (fn [e]
+                 (js/console.warn "yggstack load key error:" e)
+                 (rf/dispatch [:yggstack/start]))))))
+
+(rf/reg-event-fx
+ :yggstack/generate-new-identity
+ (fn [{db :db} _]
+   {:db (assoc-in db [:yggstack :private-key] nil)
+    :yggstack/regenerate-identity nil}))
+
+(rf/reg-fx
+ :yggstack/regenerate-identity
+ (fn [_]
+   (ygg/stop-polling)
+   (-> (ygg/stop)
+       (.catch (fn [_]))
+       (.then storage/clear-key!)
+       (.then ygg/generate-config)
+       (.then (fn [config-json]
+                (let [key (ygg/extract-private-key config-json)]
+                  (storage/save-key! key)
+                  (rf/dispatch-sync [:yggstack/set-private-key key])
+                  (rf/dispatch [:yggstack/set-status :stopped])
+                  (js/setTimeout #(rf/dispatch [:yggstack/start]) 300))))
+       (.catch (fn [e]
+                 (js/console.error "regenerate error:" e)
                  (rf/dispatch [:yggstack/set-status :error]))))))
 
 (rf/reg-fx

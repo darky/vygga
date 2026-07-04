@@ -26,7 +26,8 @@
       "bundleIdentifier": "com.anonymous.reagentexpo"
     },
     "plugins": [
-      "./plugins/withYggstack"
+      "./plugins/withYggstack",
+      "expo-secure-store"
     ],
     "android": {
       "package": "com.anonymous.reagentexpo"

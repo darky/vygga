@@ -137,7 +137,13 @@
           [button {:on-press #(rf/dispatch [:yggstack/start])
                    :disabled? (= s :starting)
                    :style {:background-color "#4CAF50" :margin-bottom 16}}
-           (if (= s :starting) "Starting..." "Start Yggdrasil")]))
+           (if (= s :starting) "Starting..." "Start Yggdrasil")])
+
+      [:> rn/View {:style {:margin-bottom 16}}
+       [button {:on-press #(rf/dispatch [:yggstack/generate-new-identity])
+                :disabled? (contains? #{:starting :stopping} @status)
+                :style {:background-color "#FF9800"}}
+        "Generate New Identity"]])
 
       [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 8}}
        (str "Peers (" (count @peers) ")")]
@@ -373,5 +379,4 @@
 
 (defn init []
   (rf/dispatch-sync [:initialize-db])
-  (js/setTimeout #(rf/dispatch [:yggstack/start]) 1000)
   (start))
