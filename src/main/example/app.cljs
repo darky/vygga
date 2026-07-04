@@ -12,9 +12,6 @@
             ["react-native-safe-area-context" :refer [useSafeAreaInsets]]
             ["@expo/vector-icons/Ionicons" :default Ionicons]))
 
-(defonce shadow-splash (js/require "../assets/shadow-cljs.png"))
-(defonce cljs-splash (js/require "../assets/cljs.png"))
-
 (defonce Stack (rnn-stack/createNativeStackNavigator))
 
 (defn status-indicator [^js props]
@@ -50,30 +47,6 @@
          [:> Ionicons {:name "settings-outline" :size 20 :color "#666"}]]
         (when (and addr (not= addr ""))
           [:> rn/Text {:style {:font-size 11 :color "#999" :margin-left 8}} (subs addr 0 15)])]])))
-
-(defn home [^js props]
-  [:> rn/View {:style {:flex 1 :background-color :white}}
-   [status-indicator props]
-   [:> rn/View {:style {:flex 1
-                        :padding-vertical 30
-                        :justify-content :space-between
-                        :align-items :center}}
-    [:> rn/View {:style {:align-items :center}}
-     [button {:on-press (fn [] (-> props .-navigation (.navigate "About")))}
-      "Tap me, I'll navigate"]
-     [button {:on-press (fn [] (-> props .-navigation (.navigate "Settings")))
-              :style {:margin-top 10}}
-      "Yggdrasil Settings"]
-     [button {:on-press (fn [] (-> props .-navigation (.navigate "Contacts")))
-              :style {:margin-top 10 :background-color "#5C6BC0"}}
-      "Messenger"]]
-    [:> rn/View
-     [:> rn/View {:style {:flex-direction :row :align-items :center :margin-bottom 20}}
-      [:> rn/Image {:style {:width 160 :height 160} :source cljs-splash}]
-      [:> rn/Image {:style {:width 160 :height 160} :source shadow-splash}]]
-     [:> rn/Text {:style {:font-weight :normal :font-size 15 :color :blue}}
-      "Using: shadow-cljs+expo+reagent+re-frame"]]]
-   [:> StatusBar {:style "auto"}]]
 
 (defn- about []
   [:> rn/View {:style {:flex 1
@@ -193,6 +166,7 @@
                *new-name (r/atom "")
                *new-addr (r/atom "")]
     [:> rn/View {:style {:flex 1 :background-color :white}}
+     [status-indicator props]
      ;; Server status bar
      [:> rn/View {:style {:flex-direction :row :align-items :center
                           :justify-content :space-between
@@ -344,22 +318,20 @@
                                  (.addListener navigation-ref "state" save-root-state!)))]
     [:> rnn/NavigationContainer {:ref add-listener!
                                  :initialState (when @!root-state (-> @!root-state .-data .-state))}
-     [:> Stack.Navigator
-      [:> Stack.Screen {:name "Home"
-                        :component (fn [props] (r/as-element [home props]))
-                        :options {:title "Vygga"}}]
-      [:> Stack.Screen {:name "About"
-                        :component (fn [props] (r/as-element [about props]))
-                        :options {:title "About"}}]
-      [:> Stack.Screen {:name "Settings"
-                        :component (fn [props] (r/as-element [settings props]))
-                        :options {:title "Yggdrasil Settings"}}]
-      [:> Stack.Screen {:name "Contacts"
-                        :component (fn [props] (r/as-element [contacts props]))
-                        :options {:title "Messenger"}}]
-      [:> Stack.Screen {:name "Chat"
-                        :component (fn [props] (r/as-element [chat props]))
-                        :options {:title "Chat"}}]]]))
+      [:> Stack.Navigator
+       [:> Stack.Screen {:name "Contacts"
+                         :component (fn [props] (r/as-element [contacts props]))
+                         :options {:title "Messenger"}}]
+       [:> Stack.Screen {:name "Chat"
+                         :component (fn [props] (r/as-element [chat props]))
+                         :options {:title "Chat"}}]
+       [:> Stack.Screen {:name "About"
+                         :component (fn [props] (r/as-element [about props]))
+                         :options {:title "About"}}]
+       [:> Stack.Screen {:name "Settings"
+                         :component (fn [props] (r/as-element [settings props]))
+                         :options {:title "Yggdrasil Settings"}}]]]))
+
 
 (defn start
   {:dev/after-load true}
