@@ -51,56 +51,42 @@
           [:> rn/Text {:style {:font-size 11 :color "#999" :margin-left 8}} (subs addr 0 15)])]])))
 
 (defn home [^js props]
-  (r/with-let [counter (rf/subscribe [:get-counter])
-               tap-enabled? (rf/subscribe [:counter-tappable?])]
-    [:> rn/View {:style {:flex 1 :background-color :white}}
-     [status-indicator props]
-     [:> rn/View {:style {:flex 1
-                          :padding-vertical 30
-                          :justify-content :space-between
-                          :align-items :center}}
-      [:> rn/View {:style {:align-items :center}}
-       [:> rn/Text {:style {:font-weight :bold
-                            :font-size 72
-                            :color :blue
-                            :margin-bottom 20}} @counter]
-       [button {:on-press #(rf/dispatch [:inc-counter])
-                :disabled? (not @tap-enabled?)
-                :style {:background-color :blue}}
-        "Tap me, I'll count"]]
-      [:> rn/View {:style {:align-items :center}}
-       [button {:on-press (fn [] (-> props .-navigation (.navigate "About")))}
-        "Tap me, I'll navigate"]
-       [button {:on-press (fn [] (-> props .-navigation (.navigate "Settings")))
-                :style {:margin-top 10}}
-        "Yggdrasil Settings"]
-       [button {:on-press (fn [] (-> props .-navigation (.navigate "Contacts")))
-                :style {:margin-top 10 :background-color "#5C6BC0"}}
-        "Messenger"]]
-      [:> rn/View
-       [:> rn/View {:style {:flex-direction :row :align-items :center :margin-bottom 20}}
-        [:> rn/Image {:style {:width 160 :height 160} :source cljs-splash}]
-        [:> rn/Image {:style {:width 160 :height 160} :source shadow-splash}]]
-       [:> rn/Text {:style {:font-weight :normal :font-size 15 :color :blue}}
-        "Using: shadow-cljs+expo+reagent+re-frame"]]]
-     [:> StatusBar {:style "auto"}]]))
+  [:> rn/View {:style {:flex 1 :background-color :white}}
+   [status-indicator props]
+   [:> rn/View {:style {:flex 1
+                        :padding-vertical 30
+                        :justify-content :space-between
+                        :align-items :center}}
+    [:> rn/View {:style {:align-items :center}}
+     [button {:on-press (fn [] (-> props .-navigation (.navigate "About")))}
+      "Tap me, I'll navigate"]
+     [button {:on-press (fn [] (-> props .-navigation (.navigate "Settings")))
+              :style {:margin-top 10}}
+      "Yggdrasil Settings"]
+     [button {:on-press (fn [] (-> props .-navigation (.navigate "Contacts")))
+              :style {:margin-top 10 :background-color "#5C6BC0"}}
+      "Messenger"]]
+    [:> rn/View
+     [:> rn/View {:style {:flex-direction :row :align-items :center :margin-bottom 20}}
+      [:> rn/Image {:style {:width 160 :height 160} :source cljs-splash}]
+      [:> rn/Image {:style {:width 160 :height 160} :source shadow-splash}]]
+     [:> rn/Text {:style {:font-weight :normal :font-size 15 :color :blue}}
+      "Using: shadow-cljs+expo+reagent+re-frame"]]]
+   [:> StatusBar {:style "auto"}]]
 
 (defn- about []
-  (r/with-let [counter (rf/subscribe [:get-counter])]
-    [:> rn/View {:style {:flex 1
-                         :padding-vertical 50
-                         :padding-horizontal 20
-                         :justify-content :space-between
-                         :align-items :flex-start
-                         :background-color :white}}
-     [:> rn/View {:style {:align-items :flex-start}}
-      [:> rn/Text {:style {:font-weight :bold :font-size 54 :color :blue :margin-bottom 20}}
-       "About Example App"]
-      [:> rn/Text {:style {:font-weight :bold :font-size 20 :color :blue :margin-bottom 20}}
-       (str "Counter is at: " @counter)]
-      [:> rn/Text {:style {:font-weight :normal :font-size 15 :color :blue}}
-       "Built with React Native, Expo, Reagent, re-frame, and React Navigation"]]
-     [:> StatusBar {:style "auto"}]]))
+  [:> rn/View {:style {:flex 1
+                       :padding-vertical 50
+                       :padding-horizontal 20
+                       :justify-content :space-between
+                       :align-items :flex-start
+                       :background-color :white}}
+   [:> rn/View {:style {:align-items :flex-start}}
+    [:> rn/Text {:style {:font-weight :bold :font-size 54 :color :blue :margin-bottom 20}}
+     "About Example App"]
+    [:> rn/Text {:style {:font-weight :normal :font-size 15 :color :blue}}
+     "Built with React Native, Expo, Reagent, re-frame, and React Navigation"]]
+   [:> StatusBar {:style "auto"}]]
 
 (defn- settings []
   (r/with-let [status (rf/subscribe [:yggstack/status])

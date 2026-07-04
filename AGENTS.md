@@ -41,19 +41,9 @@ echo '(js/alert "Hello from REPL!")' | bb scripts/nrepl_eval.clj
 echo '(-> @re-frame.db/app-db clj->js js/JSON.stringify js/JSON.parse (js/console.log))' | bb scripts/nrepl_eval.clj
 ```
 
-### Dispatch a re-frame event
-```bash
-echo '(re-frame.core/dispatch [:inc-counter])' | bb scripts/nrepl_eval.clj
-```
-
-### Call a component function / deref a subscription
-```bash
-echo '@(re-frame.core/subscribe [:get-counter])' | bb scripts/nrepl_eval.clj
-```
-
 ### Add a log statement for debugging
 ```bash
-echo '(js/console.log "debug:" (clj->js {:counter 42}))' | bb scripts/nrepl_eval.clj
+echo '(js/console.log "debug:" (clj->js {:greeting "hello"}))' | bb scripts/nrepl_eval.clj
 ```
 
 ## Multi-line code
