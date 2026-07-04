@@ -88,6 +88,8 @@ function withYggstackPermissions(config) {
     const needed = [
       'android.permission.INTERNET',
       'android.permission.ACCESS_NETWORK_STATE',
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.POST_NOTIFICATIONS',
     ];
     const existing = perms.map((p) => p.$['android:name']);
     for (const perm of needed) {
@@ -96,6 +98,29 @@ function withYggstackPermissions(config) {
       }
     }
     manifest.manifest['uses-permission'] = perms;
+    return cfg;
+  });
+}
+
+function withYggstackForegroundService(config) {
+  return withAndroidManifest(config, (cfg) => {
+    const manifest = cfg.modResults;
+    const app = manifest.manifest['application'] || [];
+    if (!app.length) return cfg;
+    const appElem = app[0];
+    const services = appElem['service'] || [];
+    const existing = services.map((s) => s.$['android:name']);
+    const serviceName = 'com.voximplant.foregroundservice.VIForegroundService';
+    if (!existing.includes(serviceName)) {
+      services.push({
+        $: {
+          'android:name': serviceName,
+          'android:foregroundServiceType': 'dataSync',
+          'android:exported': 'false',
+        },
+      });
+    }
+    appElem['service'] = services;
     return cfg;
   });
 }
@@ -150,12 +175,19 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   private Yggstack instance;
   private ScheduledExecutorService scheduler;
   private boolean running = false;
+  private boolean foregroundServiceActive = false;
   private ServerSocket messengerServer;
   private Thread messengerThread;
 
   YggstackModule(ReactApplicationContext context) {
     super(context);
     context.addLifecycleEventListener(this);
+  }
+
+  @ReactMethod
+  public void setForegroundServiceActive(boolean active, Promise promise) {
+    foregroundServiceActive = active;
+    promise.resolve(true);
   }
 
   @Override
@@ -489,6 +521,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   public void onHostPause() {}
   @Override
   public void onHostDestroy() {
+    if (foregroundServiceActive) return;
     try {
       if (instance != null) instance.stop();
     } catch (Exception ignored) {}
@@ -546,6 +579,7 @@ function withYggstack(config) {
     withYggstackCopyAAR,
     withYggstackAppBuildGradle,
     withYggstackPermissions,
+    withYggstackForegroundService,
     withYggstackModuleSources,
     withYggstackMainApplicationKt,
   ]);

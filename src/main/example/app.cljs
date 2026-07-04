@@ -103,7 +103,17 @@
        [button {:on-press #(rf/dispatch [:yggstack/generate-new-identity])
                 :disabled? (contains? #{:starting :stopping} @status)
                 :style {:background-color "#FF9800"}}
-        "Generate New Identity"]])
+         "Generate New Identity"]])
+
+      [:> rn/View {:style {:border-top-width 1 :border-top-color "#e0e0e0" :padding-top 16 :margin-bottom 16}}
+       [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 12}}
+        "Background Service"]
+       [button {:on-press #(rf/dispatch [:yggstack/battery-opt-out])
+                :style {:background-color "#FF9800" :margin-bottom 8}}
+        "Disable Battery Optimization"]
+       [button {:on-press #(rf/dispatch [:app/exit])
+                :style {:background-color "#F44336"}}
+        "Exit App"]]
 
       [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 8}}
        (str "Peers (" (count @peers) ")")]

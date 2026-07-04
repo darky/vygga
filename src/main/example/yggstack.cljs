@@ -1,6 +1,11 @@
 (ns example.yggstack
   (:require [re-frame.core :as rf]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            ["@voximplant/react-native-foreground-service" :default VIForegroundService]
+            ["react-native-battery-optimization-check" :refer [BatteryOptEnabled
+                                                               OpenOptimizationSettings
+                                                               openRequestDisableOptimization]]
+            ["react-native" :as rn]))
 
 (defonce native-module
   (try (-> (js/require "react-native") .-NativeModules .-YggstackModule)
@@ -74,6 +79,54 @@
          "\"AllowedPublicKeys\": [],"
          "\"IfName\": \"none\","
          "\"IfMTU\": 65535,"
-         "\"NodeInfoPrivacy\": false,"
+         "\"NodeInfoPrivacy\": false,
          "\"NodeInfo\": null"
          "}")))
+
+;; ---- Foreground Service ----
+
+(defonce fg-service-channel-created (atom false))
+
+(defn ensure-fg-channel! []
+  (when-not @fg-service-channel-created
+    (reset! fg-service-channel-created true)
+    (.createNotificationChannel VIForegroundService
+      #js {:id "yggdrasil_channel"
+           :name "Yggdrasil Messenger"
+           :description "Keeps the app alive for message receiving"
+           :importance 2
+           :enableVibration false})))
+
+(defn start-foreground-service [title text]
+  (ensure-fg-channel!)
+  (when native-module
+    (.setForegroundServiceActive native-module true))
+  (-> (.startService VIForegroundService
+        #js {:channelId "yggdrasil_channel"
+             :id 9001
+             :title title
+             :text text
+             :icon "ic_dialog_info"})
+      (.catch (fn [e] (js/console.warn "FG service error:" e)))))
+
+(defn stop-foreground-service []
+  (when native-module
+    (.setForegroundServiceActive native-module false))
+  (-> (.stopService VIForegroundService)
+      (.catch (fn [e] (js/console.warn "FG service stop error:" e)))))
+
+;; ---- Battery Optimization ----
+
+(defn battery-opt-enabled? []
+  (BatteryOptEnabled))
+
+(defn open-battery-optimization-settings []
+  (openRequestDisableOptimization))
+
+;; ---- Exit App ----
+
+(defn exit-app []
+  (stop-foreground-service)
+  (stop)
+  (stop-polling)
+  (.exitApp (.-BackHandler rn)))

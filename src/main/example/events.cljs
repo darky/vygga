@@ -95,13 +95,18 @@
 (rf/reg-event-fx
  :yggstack/set-status
  (fn [{db :db} [_ status]]
-   (let [fx {:db (assoc-in db [:yggstack :status] status)}]
-     (if (= status :running)
-       (assoc fx :dispatch [:messenger/start-server])
-       (if (and (= status :stopped)
-                (get-in db [:messenger :server-running]))
-          (assoc fx :dispatch [:messenger/stop-server])
-          fx)))))
+   (let [fx {:db (assoc-in db [:yggstack :status] status)}
+         dispatches (cond-> []
+                      (= status :running)
+                        (conj [:messenger/start-server]
+                              [:yggstack/start-foreground-service])
+                      (= status :stopped)
+                        (conj [:yggstack/stop-foreground-service])
+                      (and (= status :stopped)
+                           (get-in db [:messenger :server-running]))
+                        (conj [:messenger/stop-server]))]
+     (cond-> fx
+       (seq dispatches) (assoc :dispatch-n dispatches)))))
 
 (rf/reg-event-fx
  :yggstack/stop
@@ -154,6 +159,36 @@
  :yggstack/set-peers
  (fn [db [_ peers]]
    (assoc-in db [:yggstack :peers] (vec peers))))
+
+(rf/reg-fx
+ :yggstack/start-foreground-service
+ (fn [_]
+   (ygg/start-foreground-service "Yggdrasil Messenger" "Listening for messages...")))
+
+(rf/reg-fx
+ :yggstack/stop-foreground-service
+ (fn [_]
+   (ygg/stop-foreground-service)))
+
+(rf/reg-event-fx
+ :yggstack/battery-opt-out
+ (fn [_ _]
+   {:yggstack/battery-opt-out-fx nil}))
+
+(rf/reg-fx
+ :yggstack/battery-opt-out-fx
+ (fn [_]
+   (ygg/open-battery-optimization-settings)))
+
+(rf/reg-event-fx
+ :app/exit
+ (fn [_ _]
+   {:app/exit-fx nil}))
+
+(rf/reg-fx
+ :app/exit-fx
+ (fn [_]
+   (ygg/exit-app)))
 
 ;; ---- Messenger events ----
 
