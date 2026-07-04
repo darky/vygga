@@ -266,33 +266,79 @@
  (fn [{db :db} [_ contact-id text]]
    (let [contact (get-in db [:messenger :contacts contact-id])
          address (:address contact)
-         my-address (get-in db [:yggstack :address])]
+         my-address (get-in db [:yggstack :address])
+         msg-id (str (random-uuid))]
      (if (and address text (seq text))
-       {:messenger/send-via-socks {:address address
+       {:db (update-in db [:messenger :contacts contact-id :messages]
+              (fn [msgs] (conj (vec msgs)
+                              {:text text :from-me true
+                               :id msg-id :ts (.now js/Date)
+                               :status :sending})))
+        :messenger/send-via-socks {:address address
                                    :my-address my-address
                                    :contact-id contact-id
-                                   :text text}}
+                                   :text text
+                                   :msg-id msg-id}}
        (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx
  :messenger/send-via-socks
- (fn [{:keys [address my-address contact-id text]}]
-   (let [msg-id (str (random-uuid))
-         msg (js/JSON.stringify (clj->js
-                {:type "message"
-                 :from (or my-address "unknown")
-                 :text text
-                 :id msg-id
-                 :ts (.now js/Date)}))]
-     (rf/dispatch [:messenger/add-outgoing contact-id
-                   {:text text :from-me true :id msg-id :ts (.now js/Date)}])
-     (-> (msg/send-message address msg)
-         (.then (fn [result]
-                  (if result
-                    (js/console.log "Message sent to" address)
-                    (js/console.warn "Failed to send message to" address))))
-         (.catch (fn [e]
-                   (js/console.error "send error:" e)))))))
+ (fn [{:keys [address my-address contact-id text msg-id]}]
+   (let [msg (js/JSON.stringify (clj->js
+                 {:type "message"
+                  :from (or my-address "unknown")
+                  :text text
+                  :id msg-id
+                  :ts (.now js/Date)}))]
+      (-> (msg/send-message address msg)
+          (.then (fn [_]
+                   (rf/dispatch [:messenger/message-sent contact-id msg-id])))
+          (.catch (fn [e]
+                    (js/console.error "send error:" e)
+                    (rf/dispatch [:messenger/message-failed contact-id msg-id])))))))
+
+(rf/reg-event-db
+ :messenger/message-sent
+ (fn [db [_ contact-id msg-id]]
+   (update-in db [:messenger :contacts contact-id :messages]
+     (fn [msgs]
+       (mapv (fn [m] (if (= (:id m) msg-id)
+                       (assoc m :status :sent)
+                       m))
+             msgs)))))
+
+(rf/reg-event-db
+ :messenger/message-failed
+ (fn [db [_ contact-id msg-id]]
+   (update-in db [:messenger :contacts contact-id :messages]
+     (fn [msgs]
+       (mapv (fn [m] (if (= (:id m) msg-id)
+                       (assoc m :status :failed)
+                       m))
+             msgs)))))
+
+(rf/reg-event-fx
+ :messenger/resend-message
+ (fn [{db :db} [_ contact-id msg-id]]
+   (let [contact (get-in db [:messenger :contacts contact-id])
+         address (:address contact)
+         my-address (get-in db [:yggstack :address])
+         msgs (get-in db [:messenger :contacts contact-id :messages])
+         msg (some #(when (= (:id %) msg-id) %) msgs)
+         text (:text msg)]
+     (if (and address text (seq text))
+       {:db (update-in db [:messenger :contacts contact-id :messages]
+              (fn [msgs]
+                (mapv (fn [m] (if (= (:id m) msg-id)
+                                (assoc m :status :sending)
+                                m))
+                      msgs)))
+        :messenger/send-via-socks {:address address
+                                   :my-address my-address
+                                   :contact-id contact-id
+                                   :text text
+                                   :msg-id msg-id}}
+       (js/console.warn "Cannot resend: missing address or text")))))
 
 (rf/reg-event-fx
  :messenger/receive-incoming

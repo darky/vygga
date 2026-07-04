@@ -280,21 +280,40 @@
                             (when-let [s @*scroll-ref]
                               (try (.scrollToEnd s #js {:animated false})
                                    (catch js/Error _))))}
-        (if (empty? msgs)
-          [:> rn/View {:style {:padding 40 :align-items :center}}
-           [:> rn/Text {:style {:font-size 15 :color "#999"}}
-            "No messages yet"]]
-          (doall
-            (for [{:keys [text from-me id ts]} msgs]
-              [:> rn/View {:key id
-                           :style {:align-items (if from-me :flex-end :flex-start)
-                                   :margin-bottom 8}}
-               [:> rn/View {:style {:max-width "75%"
-                                    :background-color (if from-me "#007AFF" "#E8E8E8")
-                                    :border-radius 16 :padding 12}}
-                [:> rn/Text {:style {:font-size 15
-                                     :color (if from-me :white "#333")}}
-                 text]]])))]
+         (if (empty? msgs)
+           [:> rn/View {:style {:padding 40 :align-items :center}}
+            [:> rn/Text {:style {:font-size 15 :color "#999"}}
+             "No messages yet"]]
+           (into []
+             (for [m msgs
+                   :let [id (:id m)
+                         text (:text m)
+                         from-me (:from-me m)
+                         status (:status m)]]
+               [:> rn/View {:key id
+                            :style {:align-items (if from-me :flex-end :flex-start)
+                                    :margin-bottom 8}}
+                [:> rn/View {:style {:max-width "75%"
+                                     :background-color (if from-me "#007AFF" "#E8E8E8")
+                                     :border-radius 16 :padding 12}}
+                 [:> rn/Text {:style {:font-size 15
+                                      :color (if from-me :white "#333")}}
+                  text]
+                 (when (and from-me (= status :sent))
+                   [:> rn/Text {:style {:font-size 12 :color "#8ED1FF"
+                                        :text-align :right :margin-top 4}}
+                    "✓"])]
+                (when (and from-me (= status :failed))
+                  [:> rn/View {:style {:flex-direction :row :align-items :center
+                                       :margin-top 4}}
+                   [:> rn/Text {:style {:font-size 12 :color "#F44336" :margin-right 8}}
+                    "! Failed"]
+                   [:> rn/TouchableOpacity {:on-press #(rf/dispatch [:messenger/resend-message cid id])
+                                            :style {:padding-horizontal 10 :padding-vertical 4
+                                                    :border-radius 8 :border-width 1
+                                                    :border-color "#F44336"}}
+                    [:> rn/Text {:style {:font-size 12 :color "#F44336" :font-weight :600}}
+                      "Resend"]]])])))]
        ;; Input bar
         [:> rn/View {:style {:flex-direction :row :align-items :center
                              :padding 12 :border-top-width 1
