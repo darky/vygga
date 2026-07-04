@@ -8,6 +8,16 @@ After each finished task, run clj-kondo to lint Clojure(script) files:
 clj-kondo --lint src/main
 ```
 
+Then format Clojure files with cljfmt via babashka:
+
+```bash
+# Check formatting
+bb check-format
+
+# Auto-fix formatting
+bb fix-format
+```
+
 This project uses a Babashka-based nREPL client (`scripts/nrepl_eval.clj`) to evaluate ClojureScript code directly on the running Android app via the shadow-cljs nREPL server.
 
 ## Prerequisites

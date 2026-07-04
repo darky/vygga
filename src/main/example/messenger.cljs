@@ -37,7 +37,7 @@
 (defn add-remote-mapping [port]
   (if (has-method "addRemoteTCPMapping")
     (.addRemoteTCPMapping native-module (or port messenger-port)
-      (str "127.0.0.1:" (or port messenger-port)))
+                          (str "127.0.0.1:" (or port messenger-port)))
     (js/Promise.reject (js/Error. "addRemoteTCPMapping not available"))))
 
 (defn remove-remote-mapping [port]
@@ -57,15 +57,15 @@
       (when NativeEventEmitter
         (let [emitter (NativeEventEmitter. native-module)]
           (.addListener emitter "onMessengerMessage"
-            (fn [json-str]
-              (try
-                (let [msg (js/JSON.parse json-str)
-                      type (.-type msg)
-                      from (.-from msg)
-                      text (.-text msg)
-                      id (.-id msg)
-                      ts (.-ts msg)]
-                  (when (and (= type "message") from)
-                    (rf/dispatch [:messenger/receive-incoming from text id ts])))
-                (catch js/Error e
-                  (js/console.warn "Failed to parse messenger message:" e))))))))))
+                        (fn [json-str]
+                          (try
+                            (let [msg (js/JSON.parse json-str)
+                                  type (.-type msg)
+                                  from (.-from msg)
+                                  text (.-text msg)
+                                  id (.-id msg)
+                                  ts (.-ts msg)]
+                              (when (and (= type "message") from)
+                                (rf/dispatch [:messenger/receive-incoming from text id ts])))
+                            (catch js/Error e
+                              (js/console.warn "Failed to parse messenger message:" e))))))))))

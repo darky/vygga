@@ -31,20 +31,20 @@
 (defn start-polling []
   (when @poll-timer (js/clearInterval @poll-timer))
   (reset! poll-timer
-    (js/setInterval
-      (fn []
-        (when native-module
-          (-> (.getPeersJSON native-module)
-              (.then (fn [json] (rf/dispatch [:yggstack/update-peer-count
-                                               (.-length (js/JSON.parse json))])))
-              (.catch (fn [_])))
-          (-> (.getAddress native-module)
-              (.then (fn [a] (when a (rf/dispatch [:yggstack/update-address a]))))
-              (.catch (fn [_])))
-          (-> (.getPublicKey native-module)
-              (.then (fn [k] (when k (rf/dispatch [:yggstack/update-public-key k]))))
-              (.catch (fn [_])))))
-      5000)))
+          (js/setInterval
+           (fn []
+             (when native-module
+               (-> (.getPeersJSON native-module)
+                   (.then (fn [json] (rf/dispatch [:yggstack/update-peer-count
+                                                   (.-length (js/JSON.parse json))])))
+                   (.catch (fn [_])))
+               (-> (.getAddress native-module)
+                   (.then (fn [a] (when a (rf/dispatch [:yggstack/update-address a]))))
+                   (.catch (fn [_])))
+               (-> (.getPublicKey native-module)
+                   (.then (fn [k] (when k (rf/dispatch [:yggstack/update-public-key k]))))
+                   (.catch (fn [_])))))
+           5000)))
 
 (defn stop-polling []
   (when @poll-timer
@@ -79,8 +79,8 @@
          "\"AllowedPublicKeys\": [],"
          "\"IfName\": \"none\","
          "\"IfMTU\": 65535,"
-          "\"NodeInfoPrivacy\": false,"
-          "\"NodeInfo\": null"
+         "\"NodeInfoPrivacy\": false,"
+         "\"NodeInfo\": null"
          "}")))
 
 ;; ---- Foreground Service ----
@@ -91,22 +91,22 @@
   (when-not @fg-service-channel-created
     (reset! fg-service-channel-created true)
     (.createNotificationChannel VIForegroundService
-      #js {:id "yggdrasil_channel"
-           :name "Yggdrasil Messenger"
-           :description "Keeps the app alive for message receiving"
-           :importance 2
-           :enableVibration false})))
+                                #js {:id "yggdrasil_channel"
+                                     :name "Yggdrasil Messenger"
+                                     :description "Keeps the app alive for message receiving"
+                                     :importance 2
+                                     :enableVibration false})))
 
 (defn start-foreground-service [title text]
   (ensure-fg-channel!)
   (when native-module
     (.setForegroundServiceActive native-module true))
   (-> (.startService VIForegroundService
-        #js {:channelId "yggdrasil_channel"
-             :id 9001
-             :title title
-             :text text
-             :icon "ic_dialog_info"})
+                     #js {:channelId "yggdrasil_channel"
+                          :id 9001
+                          :title title
+                          :text text
+                          :icon "ic_dialog_info"})
       (.catch (fn [e] (js/console.warn "FG service error:" e)))))
 
 (defn stop-foreground-service []

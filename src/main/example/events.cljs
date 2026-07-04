@@ -99,13 +99,13 @@
    (let [fx {:db (assoc-in db [:yggstack :status] status)}
          dispatches (cond-> []
                       (= status :running)
-                        (conj [:messenger/start-server]
-                              [:yggstack/start-foreground-service])
+                      (conj [:messenger/start-server]
+                            [:yggstack/start-foreground-service])
                       (= status :stopped)
-                        (conj [:yggstack/stop-foreground-service])
+                      (conj [:yggstack/stop-foreground-service])
                       (and (= status :stopped)
                            (get-in db [:messenger :server-running]))
-                        (conj [:messenger/stop-server]))]
+                      (conj [:messenger/stop-server]))]
      (cond-> fx
        (seq dispatches) (assoc :dispatch-n dispatches)))))
 
@@ -147,14 +147,14 @@
  :yggstack/add-peer
  (fn [db [_ uri]]
    (update-in db [:yggstack :peers]
-     (fn [peers]
-       (if (some #(= % uri) peers) peers (conj peers uri))))))
+              (fn [peers]
+                (if (some #(= % uri) peers) peers (conj peers uri))))))
 
 (rf/reg-event-db
  :yggstack/remove-peer
  (fn [db [_ uri]]
    (update-in db [:yggstack :peers]
-     (fn [peers] (vec (remove #(= % uri) peers))))))
+              (fn [peers] (vec (remove #(= % uri) peers))))))
 
 (rf/reg-event-db
  :yggstack/set-peers
@@ -198,7 +198,7 @@
  (fn [db [_ {:keys [id name address]}]]
    (let [cid (or id (str (random-uuid)))]
      (assoc-in db [:messenger :contacts cid]
-       {:name name :address address :messages []}))))
+               {:name name :address address :messages []}))))
 
 (rf/reg-event-db
  :messenger/remove-contact
@@ -214,17 +214,17 @@
  :messenger/receive-message
  (fn [db [_ contact-id {:keys [text id ts]}]]
    (update-in db [:messenger :contacts contact-id :messages]
-     (fn [msgs] (conj (vec msgs) {:text text :from-me false
-                                   :id (or id (str (random-uuid)))
-                                   :ts (or ts (.now js/Date))})))))
+              (fn [msgs] (conj (vec msgs) {:text text :from-me false
+                                           :id (or id (str (random-uuid)))
+                                           :ts (or ts (.now js/Date))})))))
 
 (rf/reg-event-db
  :messenger/add-outgoing
  (fn [db [_ contact-id {:keys [text id ts]}]]
    (update-in db [:messenger :contacts contact-id :messages]
-     (fn [msgs] (conj (vec msgs) {:text text :from-me true
-                                   :id (or id (str (random-uuid)))
-                                   :ts (or ts (.now js/Date))})))))
+              (fn [msgs] (conj (vec msgs) {:text text :from-me true
+                                           :id (or id (str (random-uuid)))
+                                           :ts (or ts (.now js/Date))})))))
 
 (rf/reg-event-db
  :messenger/set-server-running
@@ -270,10 +270,10 @@
          msg-id (str (random-uuid))]
      (if (and address text (seq text))
        {:db (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs] (conj (vec msgs)
-                              {:text text :from-me true
-                               :id msg-id :ts (.now js/Date)
-                               :status :sending})))
+                       (fn [msgs] (conj (vec msgs)
+                                        {:text text :from-me true
+                                         :id msg-id :ts (.now js/Date)
+                                         :status :sending})))
         :messenger/send-via-socks {:address address
                                    :my-address my-address
                                    :contact-id contact-id
@@ -285,37 +285,37 @@
  :messenger/send-via-socks
  (fn [{:keys [address my-address contact-id text msg-id]}]
    (let [msg (js/JSON.stringify (clj->js
-                 {:type "message"
-                  :from (or my-address "unknown")
-                  :text text
-                  :id msg-id
-                  :ts (.now js/Date)}))]
-      (-> (msg/send-message address msg)
-          (.then (fn [_]
-                   (rf/dispatch [:messenger/message-sent contact-id msg-id])))
-          (.catch (fn [e]
-                    (js/console.error "send error:" e)
-                    (rf/dispatch [:messenger/message-failed contact-id msg-id])))))))
+                                 {:type "message"
+                                  :from (or my-address "unknown")
+                                  :text text
+                                  :id msg-id
+                                  :ts (.now js/Date)}))]
+     (-> (msg/send-message address msg)
+         (.then (fn [_]
+                  (rf/dispatch [:messenger/message-sent contact-id msg-id])))
+         (.catch (fn [e]
+                   (js/console.error "send error:" e)
+                   (rf/dispatch [:messenger/message-failed contact-id msg-id])))))))
 
 (rf/reg-event-db
  :messenger/message-sent
  (fn [db [_ contact-id msg-id]]
    (update-in db [:messenger :contacts contact-id :messages]
-     (fn [msgs]
-       (mapv (fn [m] (if (= (:id m) msg-id)
-                       (assoc m :status :sent)
-                       m))
-             msgs)))))
+              (fn [msgs]
+                (mapv (fn [m] (if (= (:id m) msg-id)
+                                (assoc m :status :sent)
+                                m))
+                      msgs)))))
 
 (rf/reg-event-db
  :messenger/message-failed
  (fn [db [_ contact-id msg-id]]
    (update-in db [:messenger :contacts contact-id :messages]
-     (fn [msgs]
-       (mapv (fn [m] (if (= (:id m) msg-id)
-                       (assoc m :status :failed)
-                       m))
-             msgs)))))
+              (fn [msgs]
+                (mapv (fn [m] (if (= (:id m) msg-id)
+                                (assoc m :status :failed)
+                                m))
+                      msgs)))))
 
 (rf/reg-event-fx
  :messenger/resend-message
@@ -328,11 +328,11 @@
          text (:text msg)]
      (if (and address text (seq text))
        {:db (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs]
-                (mapv (fn [m] (if (= (:id m) msg-id)
-                                (assoc m :status :sending)
-                                m))
-                      msgs)))
+                       (fn [msgs]
+                         (mapv (fn [m] (if (= (:id m) msg-id)
+                                         (assoc m :status :sending)
+                                         m))
+                               msgs)))
         :messenger/send-via-socks {:address address
                                    :my-address my-address
                                    :contact-id contact-id
@@ -347,8 +347,8 @@
          [contact-id existing]
          (reduce-kv (fn [[_ found] cid c]
                       (if found [cid true]
-                        (if (= (:address c) from-addr)
-                          [cid true] nil)))
+                          (if (= (:address c) from-addr)
+                            [cid true] nil)))
                     [nil false] contacts)
          contact-id (or contact-id from-addr)
          sender-name (if-let [c (get contacts contact-id)]
@@ -357,16 +357,16 @@
      (notifications/show! {:title sender-name :body text})
      (if existing
        {:db (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs] (conj (vec msgs)
-                               {:text text :from-me false
-                                :id (or id (str (random-uuid)))
-                                :ts (or ts (.now js/Date))})))}
+                       (fn [msgs] (conj (vec msgs)
+                                        {:text text :from-me false
+                                         :id (or id (str (random-uuid)))
+                                         :ts (or ts (.now js/Date))})))}
        ;; Unknown sender — add as temporary contact
        {:db (-> db
-               (assoc-in [:messenger :contacts from-addr]
-                 {:name sender-name
-                  :address from-addr
-                  :messages [{:text text :from-me false
-                              :id (or id (str (random-uuid)))
-                              :ts (or ts (.now js/Date))}]}))
+                (assoc-in [:messenger :contacts from-addr]
+                          {:name sender-name
+                           :address from-addr
+                           :messages [{:text text :from-me false
+                                       :id (or id (str (random-uuid)))
+                                       :ts (or ts (.now js/Date))}]}))
         :dispatch [:messenger/set-current-contact from-addr]}))))
