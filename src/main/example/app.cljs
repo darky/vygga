@@ -9,6 +9,7 @@
             [reagent.core :as r]
             ["@react-navigation/native" :as rnn]
             ["@react-navigation/native-stack" :as rnn-stack]
+            ["react-native-safe-area-context" :refer [useSafeAreaInsets]]
             ["@expo/vector-icons/Ionicons" :default Ionicons]))
 
 (defonce shadow-splash (js/require "../assets/shadow-cljs.png"))
@@ -277,7 +278,8 @@
                *scroll-ref (r/atom nil)]
     (let [cid @current-id
           c (get @contacts cid)
-          msgs (:messages c [])]
+          msgs (:messages c [])
+          insets (useSafeAreaInsets)]
       [:> rn/View {:style {:flex 1 :background-color :white}}
        ;; Header
        [:> rn/View {:style {:padding-horizontal 16 :padding-vertical 12
@@ -309,12 +311,13 @@
                                      :color (if from-me :white "#333")}}
                  text]]])))]
        ;; Input bar
-       [:> rn/View {:style {:flex-direction :row :align-items :center
-                            :padding 12 :border-top-width 1
-                            :border-top-color "#e0e0e0"}}
-        [:> rn/TextInput {:style {:flex 1 :border-width 1 :border-color "#ddd"
-                                  :border-radius 20 :padding-horizontal 16
-                                  :padding-vertical 8 :font-size 15 :margin-right 8}
+        [:> rn/View {:style {:flex-direction :row :align-items :center
+                             :padding 12 :border-top-width 1
+                             :border-top-color "#e0e0e0"
+                             :padding-bottom (+ 12 (.-bottom insets))}}
+         [:> rn/TextInput {:style {:flex 1 :border-width 1 :border-color "#ddd"
+                                   :border-radius 20 :padding-horizontal 16
+                                   :padding-vertical 12 :font-size 15 :margin-right 8}
                           :placeholder "Type a message..."
                           :value @*text
                           :on-change-text #(reset! *text %)
