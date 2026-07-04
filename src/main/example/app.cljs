@@ -1,6 +1,7 @@
 (ns example.app
   (:require [example.events]
             [example.subs]
+            [example.notifications :as notifications]
             [example.widgets :refer [button]]
             [expo.root :as expo-root]
             ["expo-status-bar" :refer [StatusBar]]
@@ -60,7 +61,7 @@
      "About Example App"]
     [:> rn/Text {:style {:font-weight :normal :font-size 15 :color :blue}}
      "Built with React Native, Expo, Reagent, re-frame, and React Navigation"]]
-   [:> StatusBar {:style "auto"}]]
+       [:> StatusBar {:style "auto"}]])
 
 (defn- settings []
   (r/with-let [status (rf/subscribe [:yggstack/status])
@@ -350,4 +351,5 @@
 
 (defn init []
   (rf/dispatch-sync [:initialize-db])
+  (notifications/init!)
   (start))

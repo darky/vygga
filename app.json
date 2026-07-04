@@ -27,7 +27,8 @@
     },
     "plugins": [
       "./plugins/withYggstack",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "android": {
       "package": "com.anonymous.reagentexpo"

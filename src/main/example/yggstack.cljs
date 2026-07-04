@@ -79,8 +79,8 @@
          "\"AllowedPublicKeys\": [],"
          "\"IfName\": \"none\","
          "\"IfMTU\": 65535,"
-         "\"NodeInfoPrivacy\": false,
-         "\"NodeInfo\": null"
+          "\"NodeInfoPrivacy\": false,"
+          "\"NodeInfo\": null"
          "}")))
 
 ;; ---- Foreground Service ----

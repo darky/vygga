@@ -3,6 +3,7 @@
    [re-frame.core :as rf]
    [example.yggstack :as ygg]
    [example.messenger :as msg]
+   [example.notifications :as notifications]
    [example.storage :as storage]
    [example.db :as db :refer [app-db]]))
 
@@ -303,7 +304,11 @@
                         (if (= (:address c) from-addr)
                           [cid true] nil)))
                     [nil false] contacts)
-         contact-id (or contact-id from-addr)]
+         contact-id (or contact-id from-addr)
+         sender-name (if-let [c (get contacts contact-id)]
+                       (:name c)
+                       (str "unknown-" (subs from-addr 0 8)))]
+     (notifications/show! {:title sender-name :body text})
      (if existing
        {:db (update-in db [:messenger :contacts contact-id :messages]
               (fn [msgs] (conj (vec msgs)
@@ -313,7 +318,7 @@
        ;; Unknown sender — add as temporary contact
        {:db (-> db
                (assoc-in [:messenger :contacts from-addr]
-                 {:name (str "unknown-" (subs from-addr 0 8))
+                 {:name sender-name
                   :address from-addr
                   :messages [{:text text :from-me false
                               :id (or id (str (random-uuid)))
