@@ -64,8 +64,10 @@
                                   from (.-from msg)
                                   text (.-text msg)
                                   id (.-id msg)
-                                  ts (.-ts msg)]
+                                  ts (.-ts msg)
+                                  pubkey (.-pubkey msg)
+                                  sig (.-sig msg)]
                               (when (and (= type "message") from)
-                                (rf/dispatch [:messenger/receive-incoming from text id ts])))
+                                (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
                             (catch js/Error e
                               (js/console.warn "Failed to parse messenger message:" e))))))))))

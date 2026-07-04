@@ -28,7 +28,8 @@
     "react-native-battery-optimization-check": "^1.0.8",
     "react-native-safe-area-context": "5.8.0",
     "react-native-screens": "~4.25.2",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "shadow-cljs": "^3.4.11"

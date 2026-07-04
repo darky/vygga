@@ -5,6 +5,7 @@
    [example.messenger :as msg]
    [example.notifications :as notifications]
    [example.storage :as storage]
+   [example.crypto :as crypto]
    [example.db :as db :refer [app-db]]))
 
 (rf/reg-event-fx
@@ -267,6 +268,8 @@
    (let [contact (get-in db [:messenger :contacts contact-id])
          address (:address contact)
          my-address (get-in db [:yggstack :address])
+         private-key (get-in db [:yggstack :private-key])
+         public-key (get-in db [:yggstack :public-key])
          msg-id (str (random-uuid))]
      (if (and address text (seq text))
        {:db (update-in db [:messenger :contacts contact-id :messages]
@@ -276,6 +279,8 @@
                                          :status :sending})))
         :messenger/send-via-socks {:address address
                                    :my-address my-address
+                                   :private-key private-key
+                                   :public-key public-key
                                    :contact-id contact-id
                                    :text text
                                    :msg-id msg-id}}
@@ -283,13 +288,18 @@
 
 (rf/reg-fx
  :messenger/send-via-socks
- (fn [{:keys [address my-address contact-id text msg-id]}]
-   (let [msg (js/JSON.stringify (clj->js
+ (fn [{:keys [address my-address private-key public-key contact-id text msg-id]}]
+   (let [ts (.now js/Date)
+         data-to-sign (str text "|" msg-id "|" ts)
+         sig (crypto/sign-message private-key data-to-sign)
+         msg (js/JSON.stringify (clj->js
                                  {:type "message"
                                   :from (or my-address "unknown")
                                   :text text
                                   :id msg-id
-                                  :ts (.now js/Date)}))]
+                                  :ts ts
+                                  :pubkey public-key
+                                  :sig sig}))]
      (-> (msg/send-message address msg)
          (.then (fn [_]
                   (rf/dispatch [:messenger/message-sent contact-id msg-id])))
@@ -323,6 +333,8 @@
    (let [contact (get-in db [:messenger :contacts contact-id])
          address (:address contact)
          my-address (get-in db [:yggstack :address])
+         private-key (get-in db [:yggstack :private-key])
+         public-key (get-in db [:yggstack :public-key])
          msgs (get-in db [:messenger :contacts contact-id :messages])
          msg (some #(when (= (:id %) msg-id) %) msgs)
          text (:text msg)]
@@ -335,6 +347,8 @@
                                msgs)))
         :messenger/send-via-socks {:address address
                                    :my-address my-address
+                                   :private-key private-key
+                                   :public-key public-key
                                    :contact-id contact-id
                                    :text text
                                    :msg-id msg-id}}
@@ -342,31 +356,57 @@
 
 (rf/reg-event-fx
  :messenger/receive-incoming
- (fn [{db :db} [_ from-addr text id ts]]
-   (let [contacts (get-in db [:messenger :contacts])
-         [contact-id existing]
-         (reduce-kv (fn [[_ found] cid c]
-                      (if found [cid true]
-                          (if (= (:address c) from-addr)
-                            [cid true] nil)))
-                    [nil false] contacts)
-         contact-id (or contact-id from-addr)
-         sender-name (if-let [c (get contacts contact-id)]
-                       (:name c)
-                       (str "unknown-" (subs from-addr 0 8)))]
-     (notifications/show! {:title sender-name :body text})
-     (if existing
-       {:db (update-in db [:messenger :contacts contact-id :messages]
-                       (fn [msgs] (conj (vec msgs)
-                                        {:text text :from-me false
-                                         :id (or id (str (random-uuid)))
-                                         :ts (or ts (.now js/Date))})))}
-       ;; Unknown sender — add as temporary contact
-       {:db (-> db
-                (assoc-in [:messenger :contacts from-addr]
-                          {:name sender-name
-                           :address from-addr
-                           :messages [{:text text :from-me false
-                                       :id (or id (str (random-uuid)))
-                                       :ts (or ts (.now js/Date))}]}))
-        :dispatch [:messenger/set-current-contact from-addr]}))))
+ (fn [{db :db} [_ from-addr text id ts pubkey sig]]
+   (let [seen-ids (get-in db [:messenger :seen-ids] #{})]
+     (cond
+       (seen-ids id)
+       (js/console.warn "Rejected duplicate message:" id)
+
+       (not (and pubkey sig))
+       (js/console.warn "Rejected unsigned message from" from-addr)
+
+       :else
+       (let [data-to-verify (str text "|" id "|" ts)]
+         (if (crypto/verify-signature pubkey data-to-verify sig)
+           ;; Valid signature — accept the message
+           (let [contacts (get-in db [:messenger :contacts])
+                 [contact-id existing]
+                 (reduce-kv (fn [[_ found] cid c]
+                              (if found [cid true]
+                                  (if (= (:address c) from-addr)
+                                    [cid true] nil)))
+                            [nil false] contacts)
+                 ;; Check pubkey mismatch for known contact
+                 pubkey-mismatch (and existing
+                                      (get-in contacts [contact-id :public-key])
+                                      (not= pubkey (get-in contacts [contact-id :public-key])))
+                 contact-id (or contact-id from-addr)
+                 sender-name (if-let [c (get contacts contact-id)]
+                               (:name c)
+                               (str "unknown-" (subs from-addr 0 8)))]
+             (if pubkey-mismatch
+               (js/console.warn "Public key mismatch for" from-addr)
+               (do
+                 (notifications/show! {:title sender-name :body text})
+                 (if existing
+                   {:db (-> db
+                            (update-in [:messenger :contacts contact-id :messages]
+                                       (fn [msgs] (conj (vec msgs)
+                                                        {:text text :from-me false
+                                                         :id id
+                                                         :ts ts})))
+                            (assoc-in [:messenger :seen-ids] (conj seen-ids id))
+                            (assoc-in [:messenger :contacts contact-id :public-key] pubkey))}
+                   {:db (-> db
+                            (assoc-in [:messenger :seen-ids] (conj seen-ids id))
+                            (assoc-in [:messenger :contacts from-addr]
+                                      {:name sender-name
+                                       :address from-addr
+                                       :public-key pubkey
+                                       :messages [{:text text :from-me false
+                                                   :id id
+                                                   :ts ts}]}))
+                    :dispatch [:messenger/set-current-contact from-addr]}))))
+
+           ;; Invalid signature
+           (js/console.warn "Invalid signature from" from-addr)))))))
