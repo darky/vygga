@@ -1,5 +1,13 @@
 # REPL-Driven Development
 
+## Code Quality
+
+After each finished task, run clj-kondo to lint Clojure(script) files:
+
+```bash
+clj-kondo --lint src/main
+```
+
 This project uses a Babashka-based nREPL client (`scripts/nrepl_eval.clj`) to evaluate ClojureScript code directly on the running Android app via the shadow-cljs nREPL server.
 
 ## Prerequisites

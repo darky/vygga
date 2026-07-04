@@ -4,5 +4,6 @@
 /app/
 /.cpcache/
 *.DS_Store
+/.clj-kondo/.cache/
 /android/
 /ios
