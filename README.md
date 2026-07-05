@@ -114,33 +114,12 @@ Quick check:
 echo '@(re-frame.core/subscribe [:yggstack/status])' | bb scripts/nrepl_eval.clj
 ```
 
-## Project Structure
-
-```
-src/main/example/      # ClojureScript application source
-  app.cljs             # Entry point, screens, navigation
-  db.cljs              # re-frame app-db schema
-  events.cljs          # Event handlers (Yggdrasil + messenger)
-  subs.cljs            # Subscriptions
-  widgets.cljs         # Reusable UI components
-  yggstack.cljs        # CLJS bridge to Yggdrasil native module
-  messenger.cljs       # CLJS bridge for TCP message server
-  crypto.cljs          # Ed25519 signing/verification
-  storage.cljs         # expo-secure-store key persistence
-  notifications.cljs   # expo-notifications setup
-vendor/yggstack/       # Yggdrasil Go library + build scripts
-plugins/               # Expo config plugin (native module generation)
-scripts/nrepl_eval.clj # Babashka nREPL eval client
-```
-
 ## Production Build
 
 ```bash
 npx shadow-cljs release app
 npx expo run:android --no-build
 ```
-
-Or use EAS Build with the included `eas-build-pre-install.sh` script (installs JDK 11 on macOS runners for shadow-cljs).
 
 ## Acknowledgments
 
