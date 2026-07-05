@@ -1,0 +1,3 @@
+[submodule "vendor/yggstack"]
+	path = vendor/yggstack
+	url = https://github.com/DrewCyber/yggstack.git
