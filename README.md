@@ -46,7 +46,7 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 ## Architecture
 
 ```
-┌───────────────────────────────────────────────----──────┐
+┌─────────────────────────────────────────────────────────┐
 │                   ClojureScript                         │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐      │
 │  │ re-frame │  │  Reagent │  │ CLJS Bridge       │      │
@@ -54,13 +54,13 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 │  │ subs     │  │          │  │ messenger.cljs    │      │
 │  └────┬─────┘  └──────────┘  └───────┬───────────┘      │
 │       │                              │                  │
-├───────┼──────────────────────────────┼─────────────----─┤
+├───────┼──────────────────────────────┼──────────────────┤
 │       │          React Native        │                  │
 │       │     ┌────────────────────────▼──────────┐       │
 │       │     │   YggstackModule.java (JNI bridge)│       │
 │       │     │   YggstackPackage.java            │       │
 │       │     └─────────────────────┬─────────────┘       │
-├───────┼───────────────────────────┼────────────────----─┤
+├───────┼───────────────────────────┼─────────────────────┤
 │       │       Native Layer        │                     │
 │       │  ┌────────────────────────▼───────────────┐     │
 │       │  │  yggstack.aar (gomobile Go bindings)   │     │
@@ -69,7 +69,7 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 │       │  │  - Remote TCP port forwarding          │     │
 │       │  │  - Messenger TCP server (port 7777)    │     │
 │       │  └────────────────────────────────────────┘     │
-└───────┴─────────────────────────────────────────────----┘
+└───────┴─────────────────────────────────────────────────┘
 ```
 
 Messages are JSON-serialized, Ed25519-signed, and sent through the SOCKS5 proxy to the recipient's Yggdrasil IPv6 address on port 7777. The receiving device exposes a local TCP server via Yggdrasil remote port forwarding and emits incoming messages as React Native events.
