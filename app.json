@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "hello-world",
-    "slug": "reagent-expo",
+    "name": "Vygga",
+    "slug": "vygga",
     "privacy": "public",
     "platforms": [
       "android",
@@ -18,7 +18,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.reagentexpo"
+      "bundleIdentifier": "com.vygga.app"
     },
     "plugins": [
       "./plugins/withYggstack",
@@ -26,7 +26,7 @@
       "expo-notifications"
     ],
     "android": {
-      "package": "com.anonymous.reagentexpo"
+      "package": "com.vygga.app"
     }
   }
 }
