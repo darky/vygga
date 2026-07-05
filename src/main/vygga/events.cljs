@@ -173,11 +173,6 @@
    (update-in db [:yggstack :peers]
               (fn [peers] (vec (remove #(= % uri) peers))))))
 
-(rf/reg-event-db
- :yggstack/set-peers
- (fn [db [_ peers]]
-   (assoc-in db [:yggstack :peers] (vec peers))))
-
 (rf/reg-event-fx
  :yggstack/start-foreground-service
  (fn [_ _]
@@ -229,14 +224,6 @@
                      :messages [] :total-count 0
                      :loaded-offset 0 :has-more? false})
       :persist/messenger-meta nil})))
-
-(rf/reg-event-fx
- :messenger/remove-contact
- (fn [{db :db} [_ id]]
-   (swap! contact-msgs-cache dissoc id)
-   {:db (update-in db [:messenger :contacts] dissoc id)
-    :persist/messenger-meta nil
-    :messenger/delete-contact-msgs {:contact-id id}}))
 
 (rf/reg-fx
  :messenger/delete-contact-msgs
@@ -348,35 +335,6 @@
        (persist/save-contact-messages! cid msgs)))))
 
 ;; ---- Messages ----
-
-(rf/reg-event-fx
- :messenger/receive-message
- (fn [{db :db} [_ contact-id {:keys [text id ts]}]]
-   (let [msg {:text text :from-me false
-              :id (or id (str (random-uuid)))
-              :ts (or ts (.now js/Date))}]
-     (update-cache! contact-id (fn [msgs] (conj (vec (or msgs [])) msg)))
-     {:db (update-contact-msgs-in-db db contact-id
-                                     (fn [msgs] (conj (vec msgs) msg)))
-      :persist/messenger-meta nil
-      :persist/messenger-msgs {:contact-id contact-id}})))
-
-(rf/reg-event-fx
- :messenger/add-outgoing
- (fn [{db :db} [_ contact-id {:keys [text id ts]}]]
-   (let [msg {:text text :from-me true
-              :id (or id (str (random-uuid)))
-              :ts (or ts (.now js/Date))}]
-     (update-cache! contact-id (fn [msgs] (conj (vec (or msgs [])) msg)))
-     {:db (update-contact-msgs-in-db db contact-id
-                                     (fn [msgs] (conj (vec msgs) msg)))
-      :persist/messenger-meta nil
-      :persist/messenger-msgs {:contact-id contact-id}})))
-
-(rf/reg-event-db
- :messenger/set-server-running
- (fn [db [_ running?]]
-   (assoc-in db [:messenger :server-running] running?)))
 
 (rf/reg-event-fx
  :messenger/start-server
