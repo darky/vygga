@@ -47,29 +47,29 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   ClojureScript                      │
+│                   ClojureScript                     │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
-│  │ re-frame │  │  Reagent  │  │ CLJS Bridge       │  │
-│  │ events/  │  │  Views    │  │ yggstack.cljs     │  │
-│  │ subs     │  │           │  │ messenger.cljs    │  │
+│  │ re-frame │  │  Reagent │  │ CLJS Bridge       │  │
+│  │ events/  │  │  Views   │  │ yggstack.cljs     │  │
+│  │ subs     │  │          │  │ messenger.cljs    │  │
 │  └────┬─────┘  └──────────┘  └───────┬───────────┘  │
-│       │                               │              │
-├───────┼───────────────────────────────┼──────────────┤
-│       │          React Native         │              │
-│       │     ┌─────────────────────────▼──────────┐   │
-│       │     │   YggstackModule.java (JNI bridge)  │   │
-│       │     │   YggstackPackage.java              │   │
-│       │     └─────────────────────┬───────────────┘   │
-├───────┼───────────────────────────┼──────────────────┤
-│       │       Native Layer        │                   │
-│       │  ┌────────────────────────▼───────────────┐   │
-│       │  │  yggstack.aar (gomobile Go bindings)    │   │
-│       │  │  - Yggdrasil P2P node                   │   │
-│       │  │  - SOCKS5 proxy (127.0.0.1:1080)        │   │
-│       │  │  - Remote TCP port forwarding           │   │
-│       │  │  - Messenger TCP server (port 7777)     │   │
-│       │  └────────────────────────────────────────┘   │
-└───────┴───────────────────────────────────────────────┘
+│       │                              │              │
+├───────┼──────────────────────────────┼──────────────┤
+│       │          React Native        │              │
+│       │     ┌────────────────────────▼──────────┐   │
+│       │     │   YggstackModule.java (JNI bridge)│   │
+│       │     │   YggstackPackage.java            │   │
+│       │     └─────────────────────┬─────────────┘   │
+├───────┼───────────────────────────┼─────────────────┤
+│       │       Native Layer        │                 │
+│       │  ┌────────────────────────▼───────────────┐ │
+│       │  │  yggstack.aar (gomobile Go bindings)   │ │
+│       │  │  - Yggdrasil P2P node                  │ │
+│       │  │  - SOCKS5 proxy (127.0.0.1:1080)       │ │
+│       │  │  - Remote TCP port forwarding          │ │
+│       │  │  - Messenger TCP server (port 7777)    │ │
+│       │  └────────────────────────────────────────┘ │
+└───────┴─────────────────────────────────────────────┘
 ```
 
 Messages are JSON-serialized, Ed25519-signed, and sent through the SOCKS5 proxy to the recipient's Yggdrasil IPv6 address on port 7777. The receiving device exposes a local TCP server via Yggdrasil remote port forwarding and emits incoming messages as React Native events.
@@ -144,4 +144,4 @@ Or use EAS Build with the included `eas-build-pre-install.sh` script (installs J
 
 ## Acknowledgments
 
-This project is built on the [rn-rf-shadow](https://github.com/PEZ/rn-rf-shadow) template — the fastest way to get ClojureScript + React Native + Reagent + re-frame up and running. The Yggdrasil integration uses [yggstack](https://github.com/DrewCyber/yggstack), Go bindings for the [Yggdrasil Network](https://yggdrasil-network.github.io/).
+This project is built on the [rn-rf-shadow](https://github.com/PEZ/rn-rf-shadow) template — the fastest way to get ClojureScript + React Native + Reagent + re-frame up and running. The Yggdrasil integration uses [yggstack](https://github.com/DrewCyber/yggstack/tree/mobile-bindings-ai), Go bindings for the [Yggdrasil Network](https://yggdrasil-network.github.io/).
