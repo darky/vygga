@@ -1,9 +1,11 @@
 (ns example.events
   (:require
    [re-frame.core :as rf]
+   [re-frame.db :as rdb]
    [example.yggstack :as ygg]
    [example.messenger :as msg]
    [example.notifications :as notifications]
+   [example.persist :as persist]
    [example.storage :as storage]
    [example.crypto :as crypto]
    [example.db :as db :refer [app-db]]))
@@ -12,7 +14,8 @@
  :initialize-db
  (fn [_ _]
    {:db app-db
-    :yggstack/load-and-start nil}))
+    :yggstack/load-and-start nil
+    :messenger/load-state nil}))
 
 (rf/reg-event-db
  :navigation/set-root-state
@@ -204,38 +207,42 @@
 
 ;; ---- Messenger events ----
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :messenger/add-contact
- (fn [db [_ {:keys [id name address]}]]
+ (fn [{db :db} [_ {:keys [id name address]}]]
    (let [cid (or id (str (random-uuid)))]
-     (assoc-in db [:messenger :contacts cid]
-               {:name name :address address :messages []}))))
+     {:db (assoc-in db [:messenger :contacts cid]
+                    {:name name :address address :messages []})
+      :persist/messenger nil})))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :messenger/remove-contact
- (fn [db [_ id]]
-   (update-in db [:messenger :contacts] dissoc id)))
+ (fn [{db :db} [_ id]]
+   {:db (update-in db [:messenger :contacts] dissoc id)
+    :persist/messenger nil}))
 
 (rf/reg-event-db
  :messenger/set-current-contact
  (fn [db [_ id]]
    (assoc-in db [:messenger :current-contact] id)))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :messenger/receive-message
- (fn [db [_ contact-id {:keys [text id ts]}]]
-   (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs] (conj (vec msgs) {:text text :from-me false
-                                           :id (or id (str (random-uuid)))
-                                           :ts (or ts (.now js/Date))})))))
+ (fn [{db :db} [_ contact-id {:keys [text id ts]}]]
+   {:db (update-in db [:messenger :contacts contact-id :messages]
+                   (fn [msgs] (conj (vec msgs) {:text text :from-me false
+                                                :id (or id (str (random-uuid)))
+                                                :ts (or ts (.now js/Date))})))
+    :persist/messenger nil}))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :messenger/add-outgoing
- (fn [db [_ contact-id {:keys [text id ts]}]]
-   (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs] (conj (vec msgs) {:text text :from-me true
-                                           :id (or id (str (random-uuid)))
-                                           :ts (or ts (.now js/Date))})))))
+ (fn [{db :db} [_ contact-id {:keys [text id ts]}]]
+   {:db (update-in db [:messenger :contacts contact-id :messages]
+                   (fn [msgs] (conj (vec msgs) {:text text :from-me true
+                                                :id (or id (str (random-uuid)))
+                                                :ts (or ts (.now js/Date))})))
+    :persist/messenger nil}))
 
 (rf/reg-event-db
  :messenger/set-server-running
@@ -272,6 +279,25 @@
    (msg/stop-server!)
    (msg/remove-remote-mapping 7777)))
 
+(rf/reg-fx
+ :persist/messenger
+ (fn [_]
+   (let [messenger (get @rdb/app-db :messenger)]
+     (persist/save-messenger! messenger))))
+
+(rf/reg-fx
+ :messenger/load-state
+ (fn [_]
+   (-> (persist/load-messenger)
+       (.then (fn [data]
+                (when data
+                  (rf/dispatch [:messenger/restore-state data])))))))
+
+(rf/reg-event-db
+ :messenger/restore-state
+ (fn [db [_ data]]
+   (assoc db :messenger data)))
+
 (rf/reg-event-fx
  :messenger/send-message
  (fn [{db :db} [_ contact-id text]]
@@ -293,7 +319,8 @@
                                    :public-key public-key
                                    :contact-id contact-id
                                    :text text
-                                   :msg-id msg-id}}
+                                   :msg-id msg-id}
+        :persist/messenger nil}
        (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx
@@ -317,25 +344,27 @@
                    (js/console.error "send error:" e)
                    (rf/dispatch [:messenger/message-failed contact-id msg-id])))))))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :messenger/message-sent
- (fn [db [_ contact-id msg-id]]
-   (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs]
-                (mapv (fn [m] (if (= (:id m) msg-id)
-                                (assoc m :status :sent)
-                                m))
-                      msgs)))))
+ (fn [{db :db} [_ contact-id msg-id]]
+   {:db (update-in db [:messenger :contacts contact-id :messages]
+                   (fn [msgs]
+                     (mapv (fn [m] (if (= (:id m) msg-id)
+                                     (assoc m :status :sent)
+                                     m))
+                           msgs)))
+    :persist/messenger nil}))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :messenger/message-failed
- (fn [db [_ contact-id msg-id]]
-   (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs]
-                (mapv (fn [m] (if (= (:id m) msg-id)
-                                (assoc m :status :failed)
-                                m))
-                      msgs)))))
+ (fn [{db :db} [_ contact-id msg-id]]
+   {:db (update-in db [:messenger :contacts contact-id :messages]
+                   (fn [msgs]
+                     (mapv (fn [m] (if (= (:id m) msg-id)
+                                     (assoc m :status :failed)
+                                     m))
+                           msgs)))
+    :persist/messenger nil}))
 
 (rf/reg-event-fx
  :messenger/resend-message
@@ -361,7 +390,8 @@
                                    :public-key public-key
                                    :contact-id contact-id
                                    :text text
-                                   :msg-id msg-id}}
+                                   :msg-id msg-id}
+        :persist/messenger nil}
        (js/console.warn "Cannot resend: missing address or text")))))
 
 (rf/reg-event-fx
@@ -406,7 +436,8 @@
                                                          :id id
                                                          :ts ts})))
                             (assoc-in [:messenger :seen-ids] (conj seen-ids id))
-                            (assoc-in [:messenger :contacts contact-id :public-key] pubkey))}
+                            (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
+                    :persist/messenger nil}
                    {:db (-> db
                             (assoc-in [:messenger :seen-ids] (conj seen-ids id))
                             (assoc-in [:messenger :contacts from-addr]
@@ -416,7 +447,8 @@
                                        :messages [{:text text :from-me false
                                                    :id id
                                                    :ts ts}]}))
-                    :dispatch [:messenger/set-current-contact from-addr]}))))
+                    :dispatch [:messenger/set-current-contact from-addr]
+                    :persist/messenger nil}))))
 
            ;; Invalid signature
            (js/console.warn "Invalid signature from" from-addr)))))))
