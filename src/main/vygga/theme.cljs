@@ -1,0 +1,64 @@
+(ns vygga.theme
+  (:require ["react-native" :as rn]))
+
+(def light
+  {:bg                   :white
+   :bg-card              "#f5f5f5"
+   :bg-card-alt          "#fafafa"
+   :bg-modal-overlay     "rgba(0,0,0,0.5)"
+   :bg-bubble-received   "#E8E8E8"
+   :bg-bubble-sent       "#007AFF"
+   :text-primary         "#333"
+   :text-secondary       "#666"
+   :text-tertiary        "#999"
+   :text-muted           "#ccc"
+   :text-inverse         :white
+   :text-bubble-sent     :white
+   :text-bubble-received "#333"
+   :border               "#e0e0e0"
+   :border-light         "#f0f0f0"
+   :border-input         "#ccc"
+   :border-input-alt     "#ddd"
+   :accent               :blue
+   :disabled             "#aaaaaa"
+   :success              "#4CAF50"
+   :warning              "#FF9800"
+   :error                "#F44336"
+   :checkmark            "#8ED1FF"
+   :empty-text           "#999"
+   :cancel-text          "#999"
+   :header-bg            :white
+   :header-text          "#333"})
+
+(def dark
+  {:bg                   "#121212"
+   :bg-card              "#1E1E1E"
+   :bg-card-alt          "#2A2A2A"
+   :bg-modal-overlay     "rgba(0,0,0,0.7)"
+   :bg-bubble-received   "#2C2C2C"
+   :bg-bubble-sent       "#0A84FF"
+   :text-primary         "#E0E0E0"
+   :text-secondary       "#AAA"
+   :text-tertiary        "#888"
+   :text-muted           "#666"
+   :text-inverse         :white
+   :text-bubble-sent     :white
+   :text-bubble-received "#E0E0E0"
+   :border               "#333"
+   :border-light         "#2A2A2A"
+   :border-input         "#444"
+   :border-input-alt     "#444"
+   :accent               "#0A84FF"
+   :disabled             "#666"
+   :success              "#4CAF50"
+   :warning              "#FF9800"
+   :error                "#F44336"
+   :checkmark            "#0A84FF"
+   :empty-text           "#888"
+   :cancel-text          "#888"
+   :header-bg            "#1E1E1E"
+   :header-text          "#E0E0E0"})
+
+(defn use-theme []
+  (let [scheme (rn/useColorScheme)]
+    (if (= scheme "dark") dark light)))
