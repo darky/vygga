@@ -11,7 +11,6 @@
    [vygga.db :as db :refer [app-db]]))
 
 (def page-size 50)
-(defonce ^:private contact-msgs-cache (atom {}))
 
 ;; ---- Core events ----
 
@@ -239,10 +238,9 @@
                   [:messenger/load-contact-messages])})))
 
 (defn- update-contact-msgs-in-db [db contact-id f]
-  (update-in db [:messenger :contacts contact-id :messages] f))
-
-(defn- update-cache! [contact-id f]
-  (swap! contact-msgs-cache update contact-id f))
+  (-> db
+      (update-in [:messenger :contacts contact-id :messages] f)
+      (update-in [:messenger :contacts contact-id :all-messages] f)))
 
 ;; ---- Message loading & pagination ----
 
@@ -271,8 +269,8 @@
    (let [total (count full-msgs)
          offset (max 0 (- total page-size))
          page (subvec full-msgs offset)]
-     (swap! contact-msgs-cache assoc contact-id full-msgs)
      (-> db
+         (assoc-in [:messenger :contacts contact-id :all-messages] full-msgs)
          (assoc-in [:messenger :contacts contact-id :messages] page)
          (assoc-in [:messenger :contacts contact-id :loaded-offset] offset)
          (assoc-in [:messenger :contacts contact-id :total-count] total)
@@ -283,17 +281,17 @@
  :messenger/load-older-messages
  (fn [{db :db} _]
    (let [cid (get-in db [:messenger :current-contact])
-         cached (get @contact-msgs-cache cid)]
-     (if (and cid cached)
+         all-msgs (get-in db [:messenger :contacts cid :all-messages])]
+     (if (and cid all-msgs)
        (let [current-offset (get-in db [:messenger :contacts cid :loaded-offset] 0)
              new-offset (max 0 (- current-offset page-size))
-             older (subvec cached new-offset current-offset)
+             older (subvec all-msgs new-offset current-offset)
              updated-msgs (into (vec older) (get-in db [:messenger :contacts cid :messages]))]
          {:db (-> db
                   (assoc-in [:messenger :contacts cid :messages] updated-msgs)
                   (assoc-in [:messenger :contacts cid :loaded-offset] new-offset)
                   (assoc-in [:messenger :contacts cid :has-more?] (> new-offset 0)))})
-       (js/console.warn "load-older-messages: no cached messages for" cid)))))
+       (js/console.warn "load-older-messages: no messages for" cid)))))
 
 ;; ---- Meta persistence ----
 
@@ -330,7 +328,7 @@
  :persist/messenger-msgs
  (fn [{:keys [contact-id]}]
    (let [cid (or contact-id (get-in @rdb/app-db [:messenger :current-contact]))
-         msgs (get @contact-msgs-cache cid)]
+         msgs (get-in @rdb/app-db [:messenger :contacts cid :all-messages])]
      (when msgs
        (persist/save-contact-messages! cid msgs)))))
 
@@ -364,7 +362,8 @@
  :messenger/stop-tcp-server
  (fn [_]
    (msg/stop-server!)
-   (msg/remove-remote-mapping 7777)))
+   (msg/remove-remote-mapping 7777)
+   (msg/uninstall-message-listener!)))
 
 (rf/reg-event-fx
  :messenger/send-message
@@ -379,19 +378,17 @@
               :id msg-id :ts (.now js/Date)
               :status :sending}]
      (if (and address text (seq text))
-       (do
-         (update-cache! contact-id (fn [msgs] (conj (vec (or msgs [])) msg)))
-         {:db (update-contact-msgs-in-db db contact-id
-                                         (fn [msgs] (conj (vec msgs) msg)))
-          :messenger/send-via-socks {:address address
-                                     :my-address my-address
-                                     :private-key private-key
-                                     :public-key public-key
-                                     :contact-id contact-id
-                                     :text text
-                                     :msg-id msg-id}
-          :persist/messenger-meta nil
-          :persist/messenger-msgs {:contact-id contact-id}})
+       {:db (update-contact-msgs-in-db db contact-id
+                                       (fn [msgs] (conj (vec msgs) msg)))
+        :messenger/send-via-socks {:address address
+                                   :my-address my-address
+                                   :private-key private-key
+                                   :public-key public-key
+                                   :contact-id contact-id
+                                   :text text
+                                   :msg-id msg-id}
+        :persist/messenger-meta nil
+        :persist/messenger-msgs {:contact-id contact-id}}
        (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx
@@ -423,7 +420,6 @@
                                      (assoc m :status :sent)
                                      m))
                            msgs))]
-     (update-cache! contact-id update-fn)
      {:db (update-contact-msgs-in-db db contact-id update-fn)
       :persist/messenger-msgs {:contact-id contact-id}})))
 
@@ -435,7 +431,6 @@
                                      (assoc m :status :failed)
                                      m))
                            msgs))]
-     (update-cache! contact-id update-fn)
      {:db (update-contact-msgs-in-db db contact-id update-fn)
       :persist/messenger-msgs {:contact-id contact-id}})))
 
@@ -456,7 +451,6 @@
                                          (assoc m :status :sending)
                                          m))
                                msgs))]
-         (update-cache! contact-id update-fn)
          {:db (update-contact-msgs-in-db db contact-id update-fn)
           :messenger/send-via-socks {:address address
                                      :my-address my-address
@@ -504,16 +498,13 @@
                (do
                  (notifications/show! {:title sender-name :body text})
                  (if existing
-                   (do
-                     (update-cache! contact-id
-                                    (fn [msgs] (conj (vec (or msgs [])) new-msg)))
-                     {:db (-> db
-                              (update-contact-msgs-in-db contact-id
-                                                         (fn [msgs] (conj (vec msgs) new-msg)))
-                              (assoc-in [:messenger :seen-ids] (conj seen-ids id))
-                              (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
-                      :persist/messenger-meta nil
-                      :persist/messenger-msgs {:contact-id contact-id}})
+                   {:db (-> db
+                            (update-contact-msgs-in-db contact-id
+                                                       (fn [msgs] (conj (vec msgs) new-msg)))
+                            (assoc-in [:messenger :seen-ids] (conj seen-ids id))
+                            (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
+                    :persist/messenger-meta nil
+                    :persist/messenger-msgs {:contact-id contact-id}}
                    {:db (-> db
                             (assoc-in [:messenger :seen-ids] (conj seen-ids id))
                             (assoc-in [:messenger :contacts from-addr]

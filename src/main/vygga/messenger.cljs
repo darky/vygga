@@ -48,26 +48,31 @@
 
 ;; ---- Event listener for incoming messages ----
 
-(defonce listener-installed (atom false))
+(defonce listener-sub (atom nil))
 
 (defn install-message-listener! []
-  (when (and native-module (not @listener-installed))
-    (reset! listener-installed true)
+  (when (and native-module (nil? @listener-sub))
     (let [NativeEventEmitter (.-NativeEventEmitter rn)]
       (when NativeEventEmitter
-        (let [emitter (NativeEventEmitter. native-module)]
-          (.addListener emitter "onMessengerMessage"
-                        (fn [json-str]
-                          (try
-                            (let [msg (js/JSON.parse json-str)
-                                  type (.-type msg)
-                                  from (.-from msg)
-                                  text (.-text msg)
-                                  id (.-id msg)
-                                  ts (.-ts msg)
-                                  pubkey (.-pubkey msg)
-                                  sig (.-sig msg)]
-                              (when (and (= type "message") from)
-                                (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
-                            (catch js/Error e
-                              (js/console.warn "Failed to parse messenger message:" e))))))))))
+        (let [emitter (NativeEventEmitter. native-module)
+              sub (.addListener emitter "onMessengerMessage"
+                                (fn [json-str]
+                                  (try
+                                    (let [msg (js/JSON.parse json-str)
+                                          type (.-type msg)
+                                          from (.-from msg)
+                                          text (.-text msg)
+                                          id (.-id msg)
+                                          ts (.-ts msg)
+                                          pubkey (.-pubkey msg)
+                                          sig (.-sig msg)]
+                                      (when (and (= type "message") from)
+                                        (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
+                                    (catch js/Error e
+                                      (js/console.warn "Failed to parse messenger message:" e)))))]
+          (reset! listener-sub #(.remove sub)))))))
+
+(defn uninstall-message-listener! []
+  (when-let [remove @listener-sub]
+    (remove)
+    (reset! listener-sub nil)))

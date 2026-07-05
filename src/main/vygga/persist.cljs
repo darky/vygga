@@ -42,7 +42,7 @@
 (defn save-messenger-meta!
   [messenger-data]
   (let [contacts (reduce-kv (fn [acc k v]
-                              (assoc acc k (dissoc v :messages)))
+                              (assoc acc k (dissoc v :messages :all-messages)))
                             {} (:contacts messenger-data))
         meta (assoc messenger-data :contacts contacts)]
     (encrypt-and-save! messenger-meta-key meta)))
