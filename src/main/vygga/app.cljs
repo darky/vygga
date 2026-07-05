@@ -197,7 +197,7 @@
                                 :border-color (if @server-running "#F44336" "#4CAF50")}}
        [:> rn/Text {:style {:font-size 12 :color (if @server-running "#F44336" "#4CAF50")}}
         (if @server-running "Stop" "Start")]]]
-     [:> rn/ScrollView {:style {:flex 1}}
+     [:> rn/ScrollView {:style {:flex 1 :padding-bottom 90}}
       (let [sorted (sort-by (fn [[_ c]] (:name c)) (vec @contacts-map))]
         (if (empty? sorted)
           [:> rn/View {:style {:padding 40 :align-items :center}}
@@ -206,7 +206,7 @@
           (doall
            (for [[cid c] sorted]
              ^{:key cid} [contact-item props cid c]))))]
-     [:> rn/Pressable {:style {:position :absolute :bottom 20 :right 20
+     [:> rn/Pressable {:style {:position :absolute :bottom 90 :right 20
                                :width 56 :height 56 :border-radius 28
                                :background-color :blue :justify-content :center
                                :align-items :center :elevation 4}
