@@ -78,7 +78,7 @@ Messages are JSON-serialized, Ed25519-signed, and sent through the SOCKS5 proxy 
 
 - **Java** 11+ (for shadow-cljs)
 - **Node.js** 18+ and npm
-- **Android Studio** with SDK (API 24+) and NDK
+- **Android SDK** (API 24+) and NDK — via [Android command-line tools](https://developer.android.com/tools) or Android Studio
 - **Go** 1.20+ (only if rebuilding the yggstack AAR)
 - **Clojure CLI tools** (optional, for linting/formatting)
 
