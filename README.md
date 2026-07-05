@@ -1,3 +1,18 @@
+```
+   *     .  .  .     *    .  .  .   *   . .  .  .
+      .  .  *  .  .  .  *   . .  .   . .  * .  .
+ .  .  .  .  .  *  .  .  .  .  *    .  . .  .  .
+      *  . ❄ .  .  *  .  .  *  .  .  .  *  . .  *
+   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  .  *  .  .  .  *  .  .  ❄ .  .  *  .  .  .  * .
+      .  . ❄ .  .  .  *  .  .  .  *   .  .  ❄ .
+.  *  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  *
+   .  .  .  *  .  ❄ .  .  *  .  .  ❄ .  .  *  .
+      ❄ .  .  .  *  .  .  .  .  .  .  *  .  .  .
+ .  .  .  .  .  .  .  ❄ .  .  *  .  .  .  .  ❄ .
+   .  *  .  .  .  .  .  .  .  .  .  .  .  *  .  .
+```
+
 # Vygga — Decentralized P2P Messenger over Yggdrasil
 
 Vygga is a **serverless, peer-to-peer messaging app for Android** that communicates over the [Yggdrasil](https://yggdrasil-network.github.io/) IPv6 mesh network. No central servers, no internet access, no phone numbers — just direct encrypted peer-to-peer messaging.
