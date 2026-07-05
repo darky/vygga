@@ -28,6 +28,50 @@ bb check-format
 bb fix-format
 ```
 
+## Clojure(script) Style: Minimize Nesting
+
+Deeply nested async chains (`->` + `.then` + `fn` + `let` + `if`) cause
+bracket-matching bugs. Follow these rules:
+
+1. **Extract helper functions** when nesting exceeds 3 levels.
+2. **Flatten chains with data-passing** — use maps as intermediate results
+   between sequential `.then` steps instead of nesting deeper to keep
+   variables in scope.
+3. **Bind complex expressions to `let` vars first**, then branch on simple
+   predicates. Never embed complex expressions directly inside `if` branches.
+4. **Write small functions.** If a `defn` body exceeds ~15 lines or has 3+
+   levels of `->`/`.then`/`let` nesting, split it up.
+5. **Run `clj-kondo --lint src/main` immediately after writing any non-trivial
+   async chain** to catch bracket errors early.
+
+### Prefer this pattern for async chains
+
+```clojure
+(defn prepend-to-index!
+  [cid entry]
+  (let [promise (js/Promise.resolve)]
+    (-> (.then promise #(load-manifest cid))
+        (.then #(decide-action cid % entry))
+        (.then #(execute-action cid %)))))
+```
+
+### Avoid deeply nested `->` + `fn` + `let` pyramids
+
+```clojure
+;; Don't: impossible to match brackets
+(defn prepend-to-index!
+  [cid entry]
+  (-> (load-manifest cid)
+      (.then (fn [m]
+               (-> (load-chunk cid (:curr m))
+                   (.then (fn [c]
+                            (let [...]
+                              (if (...)
+                                (-> ... (.then ...))
+                                (let [...]
+                                  (-> ... (.then ...) (.then ...))))))))))))
+```
+
 This project uses a Babashka-based nREPL client (`scripts/nrepl_eval.clj`) to evaluate ClojureScript code directly on the running Android app via the shadow-cljs nREPL server.
 
 ## Prerequisites
