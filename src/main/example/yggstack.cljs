@@ -1,7 +1,7 @@
 (ns example.yggstack
   (:require [re-frame.core :as rf]
             [clojure.string :as str]
-            ["@voximplant/react-native-foreground-service" :default VIForegroundService]
+            ["expo-notifications" :default Notifications]
             ["react-native-battery-optimization-check" :refer [BatteryOptEnabled
                                                                OpenOptimizationSettings
                                                                openRequestDisableOptimization]]
@@ -90,30 +90,32 @@
 (defn ensure-fg-channel! []
   (when-not @fg-service-channel-created
     (reset! fg-service-channel-created true)
-    (.createNotificationChannel VIForegroundService
-                                #js {:id "yggdrasil_channel"
-                                     :name "Yggdrasil Messenger"
-                                     :description "Keeps the app alive for message receiving"
-                                     :importance 2
-                                     :enableVibration false})))
+    (.setNotificationChannelAsync Notifications "yggdrasil_channel"
+      #js {:name "Yggdrasil Messenger"
+           :description "Keeps the app alive for message receiving"
+           :importance (.-LOW (.-AndroidImportance Notifications))
+           :enableVibration false})))
 
 (defn start-foreground-service [title text]
   (ensure-fg-channel!)
   (when native-module
     (.setForegroundServiceActive native-module true))
-  (-> (.startService VIForegroundService
-                     #js {:channelId "yggdrasil_channel"
-                          :id 9001
-                          :title title
-                          :text text
-                          :icon "ic_dialog_info"})
-      (.catch (fn [e] (js/console.warn "FG service error:" e)))))
+  (-> (.scheduleNotificationAsync Notifications
+        #js {:identifier "yggdrasil-fg"
+             :content #js {:channelId "yggdrasil_channel"
+                           :title title
+                           :body text
+                           :sticky true
+                           :priority "low"
+                           :autoDismiss false}
+             :trigger nil})
+      (.catch (fn [e] (js/console.warn "FG notification error:" e)))))
 
 (defn stop-foreground-service []
   (when native-module
     (.setForegroundServiceActive native-module false))
-  (-> (.stopService VIForegroundService)
-      (.catch (fn [e] (js/console.warn "FG service stop error:" e)))))
+  (-> (.dismissNotificationAsync Notifications "yggdrasil-fg")
+      (.catch (fn [e] (js/console.warn "FG notification stop error:" e)))))
 
 ;; ---- Battery Optimization ----
 

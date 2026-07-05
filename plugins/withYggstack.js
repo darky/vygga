@@ -102,29 +102,6 @@ function withYggstackPermissions(config) {
   });
 }
 
-function withYggstackForegroundService(config) {
-  return withAndroidManifest(config, (cfg) => {
-    const manifest = cfg.modResults;
-    const app = manifest.manifest['application'] || [];
-    if (!app.length) return cfg;
-    const appElem = app[0];
-    const services = appElem['service'] || [];
-    const existing = services.map((s) => s.$['android:name']);
-    const serviceName = 'com.voximplant.foregroundservice.VIForegroundService';
-    if (!existing.includes(serviceName)) {
-      services.push({
-        $: {
-          'android:name': serviceName,
-          'android:foregroundServiceType': 'dataSync',
-          'android:exported': 'false',
-        },
-      });
-    }
-    appElem['service'] = services;
-    return cfg;
-  });
-}
-
 function withYggstackModuleSources(config) {
   return withDangerousMod(config, [
     'android',
@@ -579,7 +556,6 @@ function withYggstack(config) {
     withYggstackCopyAAR,
     withYggstackAppBuildGradle,
     withYggstackPermissions,
-    withYggstackForegroundService,
     withYggstackModuleSources,
     withYggstackMainApplicationKt,
   ]);
