@@ -1,7 +1,15 @@
-{:deps  {dev.weavejester/cljfmt {:mvn/version "0.16.4"}}
+{:deps  {dev.weavejester/cljfmt {:mvn/version "0.16.4"}
+         io.github.borkdude/carve {:git/url "https://github.com/borkdude/carve"
+                                   :git/sha "fdd1d0bc432f63db69e3a72167ef5e46f10dfba7"}}
  :tasks {check-format {:doc "Check Clojure formatting"
                        :requires ([cljfmt.tool :as fmt])
                        :task (fmt/check {:paths ["src/main"]})}
          fix-format   {:doc "Fix Clojure formatting"
                        :requires ([cljfmt.tool :as fmt])
-                       :task (fmt/fix {:paths ["src/main"]})}}}
+                       :task (fmt/fix {:paths ["src/main"]})}
+         check-unused-vars {:doc "Check for unused vars (dry-run)"
+                            :requires ([carve.api :as carve])
+                            :task (carve/carve! {:paths ["src/main"] :dry-run true})}
+         remove-unused-vars {:doc "Interactively remove unused vars"
+                             :requires ([carve.api :as carve])
+                             :task (carve/carve! {:paths ["src/main"]})}}}

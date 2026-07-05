@@ -8,6 +8,16 @@ After each finished task, run clj-kondo to lint Clojure(script) files:
 clj-kondo --lint src/main
 ```
 
+Then check for unused vars with Carve:
+
+```bash
+# Check (dry-run, won't modify files)
+bb check-unused-vars
+
+# Interactive removal (Y/n/i for each var)
+bb remove-unused-vars
+```
+
 Then format Clojure files with cljfmt via babashka:
 
 ```bash
