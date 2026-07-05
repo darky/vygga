@@ -77,7 +77,6 @@
 (rf/reg-fx
  :yggstack/regenerate-identity
  (fn [_]
-   (ygg/stop-polling)
    (-> (ygg/stop)
        (.catch (fn [_]))
        (.then storage/clear-key!)
@@ -95,9 +94,19 @@
 (rf/reg-fx
  :yggstack/start-daemon
  (fn [{:keys [config-json socks-address nameserver]}]
-   (ygg/start-polling)
    (-> (ygg/start config-json socks-address nameserver)
-       (.then (fn [_] (rf/dispatch [:yggstack/set-status :running])))
+       (.then (fn [_]
+                (rf/dispatch [:yggstack/set-status :running])
+                (-> (ygg/get-address)
+                    (.then #(rf/dispatch [:yggstack/update-address %]))
+                    (.catch (fn [_])))
+                (-> (ygg/get-public-key)
+                    (.then #(rf/dispatch [:yggstack/update-public-key %]))
+                    (.catch (fn [_])))
+                (-> (ygg/get-peers)
+                    (.then (fn [json] (rf/dispatch [:yggstack/update-peer-count
+                                                    (.-length (js/JSON.parse json))])))
+                    (.catch (fn [_])))))
        (.catch (fn [e]
                  (js/console.error "start error:" e)
                  (rf/dispatch [:yggstack/set-status :error]))))))
@@ -127,7 +136,6 @@
 (rf/reg-fx
  :yggstack/stop-daemon
  (fn [_]
-   (ygg/stop-polling)
    (-> (ygg/stop)
        (.then (fn [_] (rf/dispatch [:yggstack/set-status :stopped])))
        (.catch (fn [e] (js/console.error "stop error:" e))))))

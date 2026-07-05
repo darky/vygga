@@ -1,6 +1,5 @@
 (ns vygga.yggstack
-  (:require [re-frame.core :as rf]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             ["expo-notifications" :as Notifications]
             ["react-native-battery-optimization-check" :refer [BatteryOptEnabled
                                                                RequestDisableOptimization]]
@@ -25,30 +24,14 @@
 (defn stop []
   (.stop native-module))
 
-(defonce poll-timer (atom nil))
+(defn get-peers []
+  (.getPeersJSON native-module))
 
-(defn start-polling []
-  (when @poll-timer (js/clearInterval @poll-timer))
-  (reset! poll-timer
-          (js/setInterval
-           (fn []
-             (when native-module
-               (-> (.getPeersJSON native-module)
-                   (.then (fn [json] (rf/dispatch [:yggstack/update-peer-count
-                                                   (.-length (js/JSON.parse json))])))
-                   (.catch (fn [_])))
-               (-> (.getAddress native-module)
-                   (.then (fn [a] (when a (rf/dispatch [:yggstack/update-address a]))))
-                   (.catch (fn [_])))
-               (-> (.getPublicKey native-module)
-                   (.then (fn [k] (when k (rf/dispatch [:yggstack/update-public-key k]))))
-                   (.catch (fn [_])))))
-           5000)))
+(defn get-address []
+  (.getAddress native-module))
 
-(defn stop-polling []
-  (when @poll-timer
-    (js/clearInterval @poll-timer)
-    (reset! poll-timer nil)))
+(defn get-public-key []
+  (.getPublicKey native-module))
 
 (defn extract-private-key [config-json]
   (let [parsed (try (js/JSON.parse config-json) (catch js/Error _ nil))]
@@ -129,5 +112,4 @@
 (defn exit-app []
   (stop-foreground-service)
   (stop)
-  (stop-polling)
   (.exitApp (.-BackHandler rn)))

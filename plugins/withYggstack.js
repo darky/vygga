@@ -142,15 +142,10 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 public class YggstackModule extends ReactContextBaseJavaModule implements LifecycleEventListener {
 
   private static final String TAG = "YggstackModule";
   private Yggstack instance;
-  private ScheduledExecutorService scheduler;
   private boolean running = false;
   private boolean foregroundServiceActive = false;
   private ServerSocket messengerServer;
@@ -200,7 +195,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
       instance.start(socksAddress, nameserver);
       running = true;
       sendEvent("onYggstackStatus", makeStatusMap());
-      startPeerPolling();
       promise.resolve(true);
     } catch (Exception e) {
       Log.e(TAG, "start error", e);
@@ -215,10 +209,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
         instance.stop();
       }
       running = false;
-      if (scheduler != null) {
-        scheduler.shutdown();
-        scheduler = null;
-      }
       sendEvent("onYggstackStatus", makeStatusMap());
       promise.resolve(true);
     } catch (Exception e) {
@@ -305,15 +295,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     } catch (Exception e) {
       promise.reject("YGGSTACK_GET_PEERS_JSON_ERROR", e.getMessage(), e);
     }
-  }
-
-  private void startPeerPolling() {
-    scheduler = Executors.newSingleThreadScheduledExecutor();
-    scheduler.scheduleAtFixedRate(() -> {
-      try {
-        sendEvent("onYggstackStatus", makeStatusMap());
-      } catch (Exception ignored) {}
-    }, 0, 5, TimeUnit.SECONDS);
   }
 
   private WritableMap makeStatusMap() {
@@ -506,7 +487,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
       if (messengerServer != null && !messengerServer.isClosed()) messengerServer.close();
     } catch (Exception ignored) {}
     running = false;
-    if (scheduler != null) scheduler.shutdown();
   }
 }
 `;
