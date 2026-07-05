@@ -9,13 +9,6 @@
       (aset bytes i (js/parseInt (subs hex-str (* i 2) (+ (* i 2) 2)) 16)))
     bytes))
 
-(defn bytes->hex
-  [bytes]
-  (let [chars (array)]
-    (doseq [i (range (.-length bytes))]
-      (.push chars (.. "0" (concat (.toString (aget bytes i) 16)) (slice -2))))
-    (.join chars "")))
-
 (defn bytes->base64
   [bytes]
   (let [chars (array)]

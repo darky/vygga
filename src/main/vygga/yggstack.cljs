@@ -1,19 +1,12 @@
 (ns vygga.yggstack
   (:require [clojure.string :as str]
             ["expo-notifications" :as Notifications]
-            ["react-native-battery-optimization-check" :refer [BatteryOptEnabled
-                                                               RequestDisableOptimization]]
+            ["react-native-battery-optimization-check" :refer [RequestDisableOptimization]]
             ["react-native" :as rn]))
 
 (defonce native-module
   (try (-> (js/require "react-native") .-NativeModules .-YggstackModule)
        (catch js/Error _ nil)))
-
-(def default-peers
-  ["tls://45.95.202.21:443"
-   "tls://box.paulll.cc:13338"
-   "tls://91.98.161.68:9001?key=0e638944bfd6b277fa5e0dddbeb4444778eea8bece63a9862c661797022a8f05"
-   "tls://95.217.35.92:1337"])
 
 (defn generate-config []
   (.generateConfig native-module))
@@ -36,15 +29,6 @@
 (defn extract-private-key [config-json]
   (let [parsed (try (js/JSON.parse config-json) (catch js/Error _ nil))]
     (when parsed (.-PrivateKey parsed))))
-
-(defn add-remote-tcp-mapping [port local-addr]
-  (.addRemoteTCPMapping native-module port local-addr))
-
-(defn remove-remote-tcp-mapping [port local-addr]
-  (.removeRemoteTCPMapping native-module port local-addr))
-
-(defn clear-remote-mappings []
-  (.clearRemoteMappings native-module))
 
 (defn build-config-json [private-key peers]
   (let [peers-str (if (seq peers)
@@ -100,9 +84,6 @@
       (.catch (fn [e] (js/console.warn "FG notification stop error:" e)))))
 
 ;; ---- Battery Optimization ----
-
-(defn battery-opt-enabled? []
-  (BatteryOptEnabled))
 
 (defn open-battery-optimization-settings []
   (RequestDisableOptimization))
