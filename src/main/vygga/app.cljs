@@ -49,20 +49,6 @@
         (when (and addr (not= addr ""))
           [:> rn/Text {:style {:font-size 11 :color "#999" :margin-left 8}} (subs addr 0 15)])]])))
 
-(defn- about []
-  [:> rn/View {:style {:flex 1
-                       :padding-vertical 50
-                       :padding-horizontal 20
-                       :justify-content :space-between
-                       :align-items :flex-start
-                       :background-color :white}}
-   [:> rn/View {:style {:align-items :flex-start}}
-    [:> rn/Text {:style {:font-weight :bold :font-size 54 :color :blue :margin-bottom 20}}
-     "About Example App"]
-    [:> rn/Text {:style {:font-weight :normal :font-size 15 :color :blue}}
-     "Built with React Native, Expo, Reagent, re-frame, and React Navigation"]]
-   [:> StatusBar {:style "auto"}]])
-
 (defn- settings []
   (r/with-let [status (rf/subscribe [:yggstack/status])
                peers (rf/subscribe [:yggstack/peers])
@@ -391,9 +377,6 @@
       [:> Stack.Screen {:name "Chat"
                         :component (fn [props] (r/as-element [chat props]))
                         :options {:title "Chat"}}]
-      [:> Stack.Screen {:name "About"
-                        :component (fn [props] (r/as-element [about props]))
-                        :options {:title "About"}}]
       [:> Stack.Screen {:name "Settings"
                         :component (fn [props] (r/as-element [settings props]))
                         :options {:title "Yggdrasil Settings"}}]]]))
