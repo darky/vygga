@@ -5,7 +5,12 @@
 
 (def encryption-key "messenger_encryption_key")
 (def messenger-meta-key "messenger_meta")
-(def messenger-msgs-prefix "messenger_msgs_")
+
+(def msg-key-prefix "msg_")
+(def idx-key-prefix "msg_idx_")
+
+(def index-chunk-max 200)
+(def index-chunk-split-size 100)
 
 (defn- get-or-create-encryption-key!
   []
@@ -39,10 +44,13 @@
                 (js/console.warn "Failed to load" storage-key ":" e)
                 nil))))
 
+;; ---- Messenger meta ----
+
 (defn save-messenger-meta!
   [messenger-data]
   (let [contacts (reduce-kv (fn [acc k v]
-                              (assoc acc k (dissoc v :messages :all-messages)))
+                              (assoc acc k (dissoc v :messages :message-index
+                                                   :all-messages)))
                             {} (:contacts messenger-data))
         meta (assoc messenger-data :contacts contacts)]
     (encrypt-and-save! messenger-meta-key meta)))
@@ -54,21 +62,107 @@
                (when data
                  (update data :seen-ids set))))))
 
-(defn save-contact-messages!
-  [contact-id messages]
-  (let [key (str messenger-msgs-prefix contact-id)]
-    (encrypt-and-save! key messages)))
+;; ---- Per-message storage ----
 
-(defn load-contact-messages
-  [contact-id]
-  (let [key (str messenger-msgs-prefix contact-id)]
-    (-> (load-and-decrypt key)
-        (.then (fn [data]
-                 (or data []))))))
+(defn- msg-key [cid msg-id]
+  (str msg-key-prefix cid "_" msg-id))
+
+(defn- idx-key [cid chunk]
+  (str idx-key-prefix cid "_" chunk))
+
+(defn- manifest-key [cid]
+  (str idx-key-prefix cid "_manifest"))
+
+(defn save-message!
+  [cid msg]
+  (encrypt-and-save! (msg-key cid (:id msg)) msg))
+
+(defn load-messages-batch
+  [cid ids]
+  (if (empty? ids)
+    (.resolve js/Promise [])
+    (let [keys (mapv #(msg-key cid %) ids)]
+      (-> (.multiGet async-storage (clj->js keys))
+          (.then (fn [entries]
+                   (-> (get-or-create-encryption-key!)
+                       (.then (fn [key]
+                                (let [result (array)]
+                                  (doseq [[_ encrypted] (js->clj entries)]
+                                    (when encrypted
+                                      (let [plaintext (crypto/decrypt encrypted key)]
+                                        (when plaintext
+                                          (.push result (.. js/JSON (parse plaintext) (js->clj :keywordize-keys true)))))))
+                                  (vec result)))))))))))
+
+;; ---- Chunked index ----
+
+(defn load-message-index-manifest
+  [cid]
+  (-> (load-and-decrypt (manifest-key cid))
+      (.then (fn [data]
+               (or data {:chunks ["_curr"] :total 0})))))
+
+(defn save-message-index-manifest!
+  [cid manifest]
+  (encrypt-and-save! (manifest-key cid) manifest))
+
+(defn load-message-index-chunk
+  [cid chunk-name]
+  (-> (load-and-decrypt (idx-key cid chunk-name))
+      (.then (fn [data] (or data [])))))
+
+(defn save-message-index-chunk!
+  [cid chunk-name entries]
+  (encrypt-and-save! (idx-key cid chunk-name) entries))
+
+;; ---- Index write (prepend entry, index first, then message) ----
+
+(defn prepend-to-index!
+  [cid entry]
+  (let [promise (js/Promise.resolve)]
+    (-> (.then promise (fn [] (load-message-index-manifest cid)))
+        (.then (fn [manifest]
+                 (let [chunks (:chunks manifest)
+                       curr-name (first chunks)
+                       new-manifest (update manifest :total inc)]
+                   (-> (load-message-index-chunk cid curr-name)
+                       (.then (fn [curr-entries]
+                                (let [new-curr (into [entry] curr-entries)]
+                                  (if (<= (count new-curr) index-chunk-max)
+                                    {:action :save-curr :cid cid :chunk curr-name
+                                     :entries new-curr :manifest new-manifest}
+                                    {:action :overflow :cid cid :chunks chunks
+                                     :chunk curr-name :new-curr new-curr
+                                     :manifest new-manifest}))))))))
+        (.then (fn [result]
+                 (if (= :save-curr (:action result))
+                   (-> (save-message-index-chunk! (:cid result) (:chunk result) (:entries result))
+                       (.then #(save-message-index-manifest! (:cid result) (:manifest result))))
+                   (let [keep (subvec (:new-curr result) 0 index-chunk-split-size)
+                         archive (subvec (:new-curr result) index-chunk-split-size)
+                         next-num (->> (:chunks result)
+                                       (filter #(re-find #"^_\d+$" %))
+                                       (map #(js/parseInt (subs % 1)))
+                                       (apply max -1)
+                                       inc)
+                         archive-name (str "_" next-num)
+                         new-manifest (-> (:manifest result)
+                                          (update :chunks
+                                                  (fn [cs] (into [archive-name] (rest cs)))))]
+                     (-> (save-message-index-chunk! (:cid result) (:chunk result) keep)
+                         (.then #(save-message-index-chunk! (:cid result) archive-name archive))
+                         (.then #(save-message-index-manifest! (:cid result) new-manifest))))))))))
+
+;; ---- Delete (for cleanup) ----
 
 (defn delete-contact-messages!
   [contact-id]
-  (let [key (str messenger-msgs-prefix contact-id)]
-    (-> (.removeItem async-storage key)
-        (.catch (fn [e]
-                  (js/console.warn "Failed to delete messages for" contact-id ":" e))))))
+  (-> (.getAllKeys async-storage)
+      (.then (fn [keys]
+               (let [prefixes #{(str msg-key-prefix contact-id "_")
+                                (str idx-key-prefix contact-id "_")}
+                     matching (->> (js->clj keys)
+                                   (filter #(some (fn [p] (.startsWith % p)) prefixes))
+                                   (clj->js))]
+                 (when (pos? (.-length matching))
+                   (.multiRemove async-storage matching)))))))

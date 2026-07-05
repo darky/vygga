@@ -220,8 +220,9 @@
    (let [cid (or id (str (random-uuid)))]
      {:db (assoc-in db [:messenger :contacts cid]
                     {:name name :address address
-                     :messages [] :total-count 0
-                     :loaded-offset 0 :has-more? false})
+                     :messages [] :message-index []
+                     :consumed-count 0 :total-count 0
+                     :pending-chunks [] :has-more? false})
       :persist/messenger-meta nil})))
 
 (rf/reg-fx
@@ -237,11 +238,6 @@
       :dispatch (when (not= id prev)
                   [:messenger/load-contact-messages])})))
 
-(defn- update-contact-msgs-in-db [db contact-id f]
-  (-> db
-      (update-in [:messenger :contacts contact-id :messages] f)
-      (update-in [:messenger :contacts contact-id :all-messages] f)))
-
 ;; ---- Message loading & pagination ----
 
 (rf/reg-event-fx
@@ -249,49 +245,125 @@
  (fn [{db :db} _]
    (let [cid (get-in db [:messenger :current-contact])]
      (if cid
-       {:messenger/load-msgs {:contact-id cid}}
+       {:db (assoc-in db [:messenger :messages-loading] true)
+        :messenger/load-initial-page {:contact-id cid}}
        (js/console.warn "load-contact-messages: no current contact")))))
 
 (rf/reg-fx
- :messenger/load-msgs
+ :messenger/load-initial-page
  (fn [{:keys [contact-id]}]
-   (-> (persist/load-contact-messages contact-id)
-       (.then (fn [msgs]
-                (let [full-msgs (or msgs [])]
-                  (rf/dispatch [:messenger/set-contact-messages contact-id full-msgs]))))
+   (-> (persist/load-message-index-manifest contact-id)
+       (.then (fn [manifest]
+                (let [total (:total manifest 0)
+                      chunks (:chunks manifest)
+                      curr-name (first chunks)
+                      pending (vec (rest chunks))]
+                  (-> (persist/load-message-index-chunk contact-id curr-name)
+                      (.then (fn [index-entries]
+                               (let [n (min page-size (count index-entries))
+                                     page-ids (mapv :id (take n index-entries))
+                                     has-more? (< n total)]
+                                 (-> (persist/load-messages-batch contact-id page-ids)
+                                     (.then (fn [msgs]
+                                              (rf/dispatch
+                                               [:messenger/set-contact-messages
+                                                contact-id msgs index-entries n total pending has-more?])))))))))))
        (.catch (fn [e]
                  (js/console.error "Failed to load messages:" e)
-                 (rf/dispatch [:messenger/set-contact-messages contact-id []]))))))
+                 (rf/dispatch [:messenger/set-contact-messages contact-id [] [] 0 0 [] false]))))))
 
 (rf/reg-event-db
  :messenger/set-contact-messages
- (fn [db [_ contact-id full-msgs]]
-   (let [total (count full-msgs)
-         offset (max 0 (- total page-size))
-         page (subvec full-msgs offset)]
+ (fn [db [_ contact-id msgs index-entries consumed total pending has-more?]]
+   (let [oldest-first (reverse msgs)]
      (-> db
-         (assoc-in [:messenger :contacts contact-id :all-messages] full-msgs)
-         (assoc-in [:messenger :contacts contact-id :messages] page)
-         (assoc-in [:messenger :contacts contact-id :loaded-offset] offset)
+         (assoc-in [:messenger :contacts contact-id :messages] oldest-first)
+         (assoc-in [:messenger :contacts contact-id :message-index] index-entries)
+         (assoc-in [:messenger :contacts contact-id :consumed-count] consumed)
          (assoc-in [:messenger :contacts contact-id :total-count] total)
-         (assoc-in [:messenger :contacts contact-id :has-more?] (> offset 0))
+         (assoc-in [:messenger :contacts contact-id :pending-chunks] pending)
+         (assoc-in [:messenger :contacts contact-id :has-more?] has-more?)
          (assoc-in [:messenger :messages-loading] false)))))
 
 (rf/reg-event-fx
  :messenger/load-older-messages
  (fn [{db :db} _]
    (let [cid (get-in db [:messenger :current-contact])
-         all-msgs (get-in db [:messenger :contacts cid :all-messages])]
-     (if (and cid all-msgs)
-       (let [current-offset (get-in db [:messenger :contacts cid :loaded-offset] 0)
-             new-offset (max 0 (- current-offset page-size))
-             older (subvec all-msgs new-offset current-offset)
-             updated-msgs (into (vec older) (get-in db [:messenger :contacts cid :messages]))]
+         contact (get-in db [:messenger :contacts cid])]
+     (if contact
+       (let [index-entries (:message-index contact [])
+             consumed (:consumed-count contact 0)
+             total (:total-count contact 0)
+             pending (:pending-chunks contact [])
+             remaining (- (count index-entries) consumed)]
+         (if (pos? remaining)
+           (let [n (min page-size remaining)
+                 ids (mapv :id (subvec index-entries consumed (+ consumed n)))
+                 new-consumed (+ consumed n)
+                 has-more? (< new-consumed total)]
+             {:messenger/load-older-batch {:contact-id cid
+                                           :ids ids
+                                           :new-consumed new-consumed
+                                           :has-more? has-more?}})
+           (if (seq pending)
+             {:messenger/load-next-chunk {:contact-id cid
+                                          :total total
+                                          :pending pending}}
+             (js/console.warn "load-older-messages: no more messages"))))
+       (js/console.warn "load-older-messages: no contact" cid)))))
+
+(rf/reg-fx
+ :messenger/load-older-batch
+ (fn [{:keys [contact-id ids new-consumed has-more?]}]
+   (-> (persist/load-messages-batch contact-id ids)
+       (.then (fn [msgs]
+                (rf/dispatch [:messenger/prepend-older-messages
+                              contact-id msgs new-consumed has-more?]))))))
+
+(rf/reg-event-db
+ :messenger/prepend-older-messages
+ (fn [db [_ contact-id msgs consumed has-more?]]
+   (let [oldest-first (reverse msgs)]
+     (-> db
+         (update-in [:messenger :contacts contact-id :messages]
+                    (fn [cur] (into oldest-first (vec cur))))
+         (assoc-in [:messenger :contacts contact-id :consumed-count] consumed)
+         (assoc-in [:messenger :contacts contact-id :has-more?] has-more?)))))
+
+(rf/reg-fx
+ :messenger/load-next-chunk
+ (fn [{:keys [contact-id total pending]}]
+   (let [chunk-name (first pending)
+         rest-chunks (vec (rest pending))]
+     (-> (persist/load-message-index-chunk contact-id chunk-name)
+         (.then (fn [entries]
+                  (rf/dispatch [:messenger/chunk-loaded
+                                contact-id entries rest-chunks total])))))))
+(rf/reg-event-fx
+ :messenger/chunk-loaded
+ (fn [{db :db} [_ contact-id entries rest-chunks total]]
+   (let [contact (get-in db [:messenger :contacts contact-id])
+         index-entries (:message-index contact [])
+         consumed (:consumed-count contact 0)
+         updated-index (into index-entries entries)
+         remaining (- (count updated-index) consumed)]
+     (if (pos? remaining)
+       (let [n (min page-size remaining)
+             ids (mapv :id (subvec updated-index consumed (+ consumed n)))
+             new-consumed (+ consumed n)
+             has-more? (or (seq rest-chunks) (< new-consumed total))]
          {:db (-> db
-                  (assoc-in [:messenger :contacts cid :messages] updated-msgs)
-                  (assoc-in [:messenger :contacts cid :loaded-offset] new-offset)
-                  (assoc-in [:messenger :contacts cid :has-more?] (> new-offset 0)))})
-       (js/console.warn "load-older-messages: no messages for" cid)))))
+                  (assoc-in [:messenger :contacts contact-id :message-index] updated-index)
+                  (assoc-in [:messenger :contacts contact-id :pending-chunks] rest-chunks)
+                  (assoc-in [:messenger :contacts contact-id :has-more?] true))
+          :messenger/load-older-batch {:contact-id contact-id
+                                       :ids ids
+                                       :new-consumed new-consumed
+                                       :has-more? has-more?}})
+       {:db (-> db
+                (assoc-in [:messenger :contacts contact-id :message-index] updated-index)
+                (assoc-in [:messenger :contacts contact-id :pending-chunks] rest-chunks)
+                (assoc-in [:messenger :contacts contact-id :has-more?] (seq rest-chunks)))}))))
 
 ;; ---- Meta persistence ----
 
@@ -311,9 +383,11 @@
    (let [contacts (reduce-kv (fn [acc k v]
                                (assoc acc k
                                       (merge {:messages []
-                                              :loaded-offset 0
+                                              :message-index []
+                                              :consumed-count 0
                                               :has-more? false
-                                              :total-count 0}
+                                              :total-count 0
+                                              :pending-chunks []}
                                              v)))
                              {} (:contacts data))]
      (assoc db :messenger (assoc data :contacts contacts)))))
@@ -325,12 +399,17 @@
      (persist/save-messenger-meta! messenger))))
 
 (rf/reg-fx
- :persist/messenger-msgs
- (fn [{:keys [contact-id]}]
-   (let [cid (or contact-id (get-in @rdb/app-db [:messenger :current-contact]))
-         msgs (get-in @rdb/app-db [:messenger :contacts cid :all-messages])]
-     (when msgs
-       (persist/save-contact-messages! cid msgs)))))
+ :persist/messenger-write
+ (fn [{:keys [contact-id index-entry msg]}]
+   (-> (persist/prepend-to-index! contact-id index-entry)
+       (.then #(persist/save-message! contact-id msg))
+       (.catch (fn [e]
+                 (js/console.error "persist write error:" e))))))
+
+(rf/reg-fx
+ :persist/messenger-update-msg
+ (fn [{:keys [contact-id msg]}]
+   (persist/save-message! contact-id msg)))
 
 ;; ---- Messages ----
 
@@ -374,28 +453,31 @@
          private-key (get-in db [:yggstack :private-key])
          public-key (get-in db [:yggstack :public-key])
          msg-id (str (random-uuid))
+         ts (.now js/Date)
          msg {:text text :from-me true
-              :id msg-id :ts (.now js/Date)
+              :id msg-id :ts ts
               :status :sending}]
      (if (and address text (seq text))
-       {:db (update-contact-msgs-in-db db contact-id
-                                       (fn [msgs] (conj (vec msgs) msg)))
+       {:db (update-in db [:messenger :contacts contact-id :messages]
+                       (fn [msgs] (conj (vec msgs) msg)))
         :messenger/send-via-socks {:address address
                                    :my-address my-address
                                    :private-key private-key
                                    :public-key public-key
                                    :contact-id contact-id
                                    :text text
-                                   :msg-id msg-id}
+                                   :msg-id msg-id
+                                   :ts ts}
         :persist/messenger-meta nil
-        :persist/messenger-msgs {:contact-id contact-id}}
+        :persist/messenger-write {:contact-id contact-id
+                                  :index-entry {:id msg-id :ts ts}
+                                  :msg msg}}
        (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx
  :messenger/send-via-socks
- (fn [{:keys [address my-address private-key public-key contact-id text msg-id]}]
-   (let [ts (.now js/Date)
-         data-to-sign (str text "|" msg-id "|" ts)
+ (fn [{:keys [address my-address private-key public-key contact-id text msg-id ts]}]
+   (let [data-to-sign (str text "|" msg-id "|" ts)
          sig (crypto/sign-message private-key data-to-sign)
          msg (js/JSON.stringify (clj->js
                                  {:type "message"
@@ -415,24 +497,28 @@
 (rf/reg-event-fx
  :messenger/message-sent
  (fn [{db :db} [_ contact-id msg-id]]
-   (let [update-fn (fn [msgs]
-                     (mapv (fn [m] (if (= (:id m) msg-id)
-                                     (assoc m :status :sent)
-                                     m))
-                           msgs))]
-     {:db (update-contact-msgs-in-db db contact-id update-fn)
-      :persist/messenger-msgs {:contact-id contact-id}})))
+   (let [db' (update-in db [:messenger :contacts contact-id :messages]
+                        (fn [msgs]
+                          (mapv (fn [m] (if (= (:id m) msg-id)
+                                          (assoc m :status :sent)
+                                          m))
+                                msgs)))
+         msg (some #(when (= (:id %) msg-id) %) (get-in db' [:messenger :contacts contact-id :messages]))]
+     {:db db'
+      :persist/messenger-update-msg {:contact-id contact-id :msg msg}})))
 
 (rf/reg-event-fx
  :messenger/message-failed
  (fn [{db :db} [_ contact-id msg-id]]
-   (let [update-fn (fn [msgs]
-                     (mapv (fn [m] (if (= (:id m) msg-id)
-                                     (assoc m :status :failed)
-                                     m))
-                           msgs))]
-     {:db (update-contact-msgs-in-db db contact-id update-fn)
-      :persist/messenger-msgs {:contact-id contact-id}})))
+   (let [db' (update-in db [:messenger :contacts contact-id :messages]
+                        (fn [msgs]
+                          (mapv (fn [m] (if (= (:id m) msg-id)
+                                          (assoc m :status :failed)
+                                          m))
+                                msgs)))
+         msg (some #(when (= (:id %) msg-id) %) (get-in db' [:messenger :contacts contact-id :messages]))]
+     {:db db'
+      :persist/messenger-update-msg {:contact-id contact-id :msg msg}})))
 
 (rf/reg-event-fx
  :messenger/resend-message
@@ -444,23 +530,27 @@
          public-key (get-in db [:yggstack :public-key])
          msgs (get-in db [:messenger :contacts contact-id :messages])
          msg (some #(when (= (:id %) msg-id) %) msgs)
-         text (:text msg)]
+         text (:text msg)
+         ts (:ts msg)]
      (if (and address text (seq text))
-       (let [update-fn (fn [msgs]
-                         (mapv (fn [m] (if (= (:id m) msg-id)
-                                         (assoc m :status :sending)
-                                         m))
-                               msgs))]
-         {:db (update-contact-msgs-in-db db contact-id update-fn)
+       (let [db' (update-in db [:messenger :contacts contact-id :messages]
+                            (fn [msgs]
+                              (mapv (fn [m] (if (= (:id m) msg-id)
+                                              (assoc m :status :sending)
+                                              m))
+                                    msgs)))
+             updated-msg (some #(when (= (:id %) msg-id) %) (get-in db' [:messenger :contacts contact-id :messages]))]
+         {:db db'
           :messenger/send-via-socks {:address address
                                      :my-address my-address
                                      :private-key private-key
                                      :public-key public-key
                                      :contact-id contact-id
                                      :text text
-                                     :msg-id msg-id}
+                                     :msg-id msg-id
+                                     :ts ts}
           :persist/messenger-meta nil
-          :persist/messenger-msgs {:contact-id contact-id}})
+          :persist/messenger-update-msg {:contact-id contact-id :msg updated-msg}})
        (js/console.warn "Cannot resend: missing address or text")))))
 
 (rf/reg-event-fx
@@ -499,12 +589,14 @@
                  (notifications/show! {:title sender-name :body text})
                  (if existing
                    {:db (-> db
-                            (update-contact-msgs-in-db contact-id
-                                                       (fn [msgs] (conj (vec msgs) new-msg)))
+                            (update-in [:messenger :contacts contact-id :messages]
+                                       (fn [msgs] (conj (vec msgs) new-msg)))
                             (assoc-in [:messenger :seen-ids] (conj seen-ids id))
                             (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
                     :persist/messenger-meta nil
-                    :persist/messenger-msgs {:contact-id contact-id}}
+                    :persist/messenger-write {:contact-id contact-id
+                                              :index-entry {:id id :ts ts}
+                                              :msg new-msg}}
                    {:db (-> db
                             (assoc-in [:messenger :seen-ids] (conj seen-ids id))
                             (assoc-in [:messenger :contacts from-addr]
@@ -512,9 +604,13 @@
                                        :address from-addr
                                        :public-key pubkey
                                        :messages [new-msg]
+                                       :message-index [{:id id :ts ts}]
+                                       :consumed-count 1
                                        :total-count 1
-                                       :loaded-offset 0
+                                       :pending-chunks []
                                        :has-more? false}))
                     :persist/messenger-meta nil
-                    :persist/messenger-msgs {:contact-id from-addr}}))))
+                    :persist/messenger-write {:contact-id from-addr
+                                              :index-entry {:id id :ts ts}
+                                              :msg new-msg}}))))
            (js/console.warn "Invalid signature from" from-addr)))))))
