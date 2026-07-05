@@ -1,10 +1,9 @@
 (ns example.yggstack
   (:require [re-frame.core :as rf]
             [clojure.string :as str]
-            ["expo-notifications" :default Notifications]
+            ["expo-notifications" :as Notifications]
             ["react-native-battery-optimization-check" :refer [BatteryOptEnabled
-                                                               OpenOptimizationSettings
-                                                               openRequestDisableOptimization]]
+                                                               RequestDisableOptimization]]
             ["react-native" :as rn]))
 
 (defonce native-module
@@ -90,31 +89,31 @@
 (defn ensure-fg-channel! []
   (when-not @fg-service-channel-created
     (reset! fg-service-channel-created true)
-    (.setNotificationChannelAsync Notifications "yggdrasil_channel"
-      #js {:name "Yggdrasil Messenger"
-           :description "Keeps the app alive for message receiving"
-           :importance (.-LOW (.-AndroidImportance Notifications))
-           :enableVibration false})))
+    (Notifications/setNotificationChannelAsync "yggdrasil_channel"
+                                               #js {:name "Yggdrasil Messenger"
+                                                    :description "Keeps the app alive for message receiving"
+                                                    :importance (.-LOW (.-AndroidImportance Notifications))
+                                                    :enableVibration false})))
 
 (defn start-foreground-service [title text]
   (ensure-fg-channel!)
   (when native-module
     (.setForegroundServiceActive native-module true))
-  (-> (.scheduleNotificationAsync Notifications
-        #js {:identifier "yggdrasil-fg"
-             :content #js {:channelId "yggdrasil_channel"
-                           :title title
-                           :body text
-                           :sticky true
-                           :priority "low"
-                           :autoDismiss false}
-             :trigger nil})
+  (-> (Notifications/scheduleNotificationAsync
+       #js {:identifier "yggdrasil-fg"
+            :content #js {:channelId "yggdrasil_channel"
+                          :title title
+                          :body text
+                          :sticky true
+                          :priority "low"
+                          :autoDismiss false}
+            :trigger nil})
       (.catch (fn [e] (js/console.warn "FG notification error:" e)))))
 
 (defn stop-foreground-service []
   (when native-module
     (.setForegroundServiceActive native-module false))
-  (-> (.dismissNotificationAsync Notifications "yggdrasil-fg")
+  (-> (Notifications/dismissNotificationAsync "yggdrasil-fg")
       (.catch (fn [e] (js/console.warn "FG notification stop error:" e)))))
 
 ;; ---- Battery Optimization ----
@@ -123,7 +122,7 @@
   (BatteryOptEnabled))
 
 (defn open-battery-optimization-settings []
-  (openRequestDisableOptimization))
+  (RequestDisableOptimization))
 
 ;; ---- Exit App ----
 

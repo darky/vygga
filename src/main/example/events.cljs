@@ -162,6 +162,16 @@
  (fn [db [_ peers]]
    (assoc-in db [:yggstack :peers] (vec peers))))
 
+(rf/reg-event-fx
+ :yggstack/start-foreground-service
+ (fn [_ _]
+   {:yggstack/start-foreground-service nil}))
+
+(rf/reg-event-fx
+ :yggstack/stop-foreground-service
+ (fn [_ _]
+   {:yggstack/stop-foreground-service nil}))
+
 (rf/reg-fx
  :yggstack/start-foreground-service
  (fn [_]
