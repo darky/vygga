@@ -46,30 +46,30 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   ClojureScript                     │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
-│  │ re-frame │  │  Reagent │  │ CLJS Bridge       │  │
-│  │ events/  │  │  Views   │  │ yggstack.cljs     │  │
-│  │ subs     │  │          │  │ messenger.cljs    │  │
-│  └────┬─────┘  └──────────┘  └───────┬───────────┘  │
-│       │                              │              │
-├───────┼──────────────────────────────┼──────────────┤
-│       │          React Native        │              │
-│       │     ┌────────────────────────▼──────────┐   │
-│       │     │   YggstackModule.java (JNI bridge)│   │
-│       │     │   YggstackPackage.java            │   │
-│       │     └─────────────────────┬─────────────┘   │
-├───────┼───────────────────────────┼─────────────────┤
-│       │       Native Layer        │                 │
-│       │  ┌────────────────────────▼───────────────┐ │
-│       │  │  yggstack.aar (gomobile Go bindings)   │ │
-│       │  │  - Yggdrasil P2P node                  │ │
-│       │  │  - SOCKS5 proxy (127.0.0.1:1080)       │ │
-│       │  │  - Remote TCP port forwarding          │ │
-│       │  │  - Messenger TCP server (port 7777)    │ │
-│       │  └────────────────────────────────────────┘ │
-└───────┴─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────----──────┐
+│                   ClojureScript                         │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐      │
+│  │ re-frame │  │  Reagent │  │ CLJS Bridge       │      │
+│  │ events/  │  │  Views   │  │ yggstack.cljs     │      │
+│  │ subs     │  │          │  │ messenger.cljs    │      │
+│  └────┬─────┘  └──────────┘  └───────┬───────────┘      │
+│       │                              │                  │
+├───────┼──────────────────────────────┼─────────────----─┤
+│       │          React Native        │                  │
+│       │     ┌────────────────────────▼──────────┐       │
+│       │     │   YggstackModule.java (JNI bridge)│       │
+│       │     │   YggstackPackage.java            │       │
+│       │     └─────────────────────┬─────────────┘       │
+├───────┼───────────────────────────┼────────────────----─┤
+│       │       Native Layer        │                     │
+│       │  ┌────────────────────────▼───────────────┐     │
+│       │  │  yggstack.aar (gomobile Go bindings)   │     │
+│       │  │  - Yggdrasil P2P node                  │     │
+│       │  │  - SOCKS5 proxy (127.0.0.1:1080)       │     │
+│       │  │  - Remote TCP port forwarding          │     │
+│       │  │  - Messenger TCP server (port 7777)    │     │
+│       │  └────────────────────────────────────────┘     │
+└───────┴─────────────────────────────────────────────----┘
 ```
 
 Messages are JSON-serialized, Ed25519-signed, and sent through the SOCKS5 proxy to the recipient's Yggdrasil IPv6 address on port 7777. The receiving device exposes a local TCP server via Yggdrasil remote port forwarding and emits incoming messages as React Native events.
