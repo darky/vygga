@@ -14,13 +14,4 @@
 
   ;; Shadow-cljs build
   :shadow     {:main-opts ["-m" "shadow.cljs.devtools.cli"]}
-
-  ;; For connecting via MCP from pez-client side
-  :mcp-client {:extra-deps {org.slf4j/slf4j-nop     {:mvn/version "2.0.16"}
-                            com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
-                                                     :git/tag "v0.1.8-alpha"
-                                                     :git/sha "457f197"}}
-               :exec-fn    clojure-mcp.main/start-mcp-server
-               :exec-args  {:port         7892              ; Different port for pez-client REPL
-                            :type         :shadow-cljs
-                            :shadow-build "app"}}}}
+}}
