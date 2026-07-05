@@ -1,211 +1,132 @@
-**Looking for maintainers.** I am no longer using React Native for work or for any open source things. I haven't for quite a long time and am not giving this template the attention it needs. If you are using RN with ClojureScript and want to help the community with keeping this quick starter up to date, please contact me where you find Clojurians.
+# Vygga — Decentralized P2P Messenger over Yggdrasil
 
-# React Native using shadow-cljs in 3 minutes
+Vygga is a **serverless, peer-to-peer messaging app for Android** that communicates over the [Yggdrasil](https://yggdrasil-network.github.io/) IPv6 mesh network. No central servers, no internet access, no phone numbers — just direct encrypted peer-to-peer messaging.
 
-The fastest way a [ClojureScript](https://clojurescript.org/) coder can get started with React Native development. *Prove me wrong.*
+Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a **Go native module** (yggstack via gomobile) providing full Yggdrasil node capabilities directly on the device.
 
-This is an example project, only slightly beyond *Hello World*, using: [shadow-cljs](https://github.com/thheller/shadow-cljs), [React Native](https://facebook.github.io/react-native/), [Expo](https://expo.io/), [Reagent](https://reagent-project.github.io/), and [re-frame](https://github.com/Day8/re-frame).
+## Features
 
-<div style="display: flex; justify-content: space-around;">
-  <div style="flex: 1"><img src="./rn-rf-shadow.png" width="240" /></div>
-  <div style="flex: 1">Check this video out for a demo of this project.<br>
-  <a href="https://www.youtube.com/watch?v=QsUj7HO5xDg"><img src="https://img.youtube.com/vi/QsUj7HO5xDg/maxresdefault.jpg" width="320px"><br>
-ClojureScript ❤️ React Native</a>
-  </div>
-</div>
+- **P2P Messaging** — Send and receive messages directly between devices over the Yggdrasil mesh
+- **Cryptographic Identity** — Ed25519 keypair generated on-device; messages are signed and verified via tweetnacl
+- **Contact Management** — Add contacts by Yggdrasil IPv6 address; unknown senders auto-create contacts
+- **Secure Storage** — Identity (private key) persisted via expo-secure-store (Android Keystore)
+- **Background Operation** — Android foreground service keeps the messenger running to receive messages
+- **Push Notifications** — expo-notifications alerts for incoming messages
+- **Battery Optimization** — Settings screen to disable battery saving for the app
+- **REPL-Driven Development** — Live code iteration via shadow-cljs nREPL against the running Android device
 
-Follow along to get started. There are instructions for [Calva](http://calva.io), [Emacs/CIDER](https://cider.mx), [Cursive](https://cursive-ide.com), and the command line. It is assumed you have Java and Node installad as well as dev tool chains for the platforms you are targeting. (If you are targeting the Web, then Chrome is enough.)
+## Tech Stack
 
-## Installing
+| Layer | Technology | Role |
+|---|---|---|
+| Application Logic | [ClojureScript](https://clojurescript.org/) 1.12 | Reagent + re-frame |
+| UI Framework | [Reagent](https://reagent-project.github.io/) 2.0.1 | Declarative React Native components |
+| State Management | [re-frame](https://github.com/Day8/re-frame) 1.4.7 | Event-driven state |
+| CLJS Build | [shadow-cljs](https://shadow-cljs.github.io/) 3.4 | Hot-reload, nREPL, release builds |
+| Mobile Shell | [React Native](https://reactnative.dev/) 0.86 + [Expo](https://expo.io/) SDK 57 | Cross-platform runtime |
+| Navigation | [React Navigation](https://reactnavigation.org/) 7 | Screen navigation |
+| Crypto | [tweetnacl](https://tweetnacl.js.org/) 1.0.3 | Ed25519 signing/verification |
+| Network | [yggstack](https://github.com/DrewCyber/yggstack) (Go/gomobile AAR) | Yggdrasil node + SOCKS5 proxy |
 
-To facilitate that you can easily try this out without installing anything globally on your machine, this project installs everything it needs locally in `node_modules`. Then `npx` is used to execute tools like `expo-cli`.
+## Architecture
 
-To install dependencies, and setup the project, run:
-
-1. `npm i`
-
-From there use your favorite editor and/or the prompt.
-
-## Using VS Code + Calva
-
-Assuming you have installed the [Calva](https://calva.io) extension in VS Code:
-
-### Build and start the app, and connect Calva
-
-1. Open the project in VS Code. Then:
-1. Run the Calva command **Start a Project REPL and Connect (aka Jack-in)**
-   1. Wait for shadow to build the project.
-
-### Start Expo
-
-1. Then **Run Build Task**. This will start Expo and the Metro
-   bundler. Wait for expo to show its menu options in the terminal pane.
-1. In the expo menu press w for **open web**.
-
-The app now should be running in your web browser and Calva automatically connects to it. Confirm this by evaluating something like this in Calva (from a cljs file or in the REPL window):
-
-``` clojure
-(js/alert "Hello world!")
+```
+┌─────────────────────────────────────────────────────┐
+│                   ClojureScript                      │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
+│  │ re-frame │  │  Reagent  │  │ CLJS Bridge       │  │
+│  │ events/  │  │  Views    │  │ yggstack.cljs     │  │
+│  │ subs     │  │           │  │ messenger.cljs    │  │
+│  └────┬─────┘  └──────────┘  └───────┬───────────┘  │
+│       │                               │              │
+├───────┼───────────────────────────────┼──────────────┤
+│       │          React Native         │              │
+│       │     ┌─────────────────────────▼──────────┐   │
+│       │     │   YggstackModule.java (JNI bridge)  │   │
+│       │     │   YggstackPackage.java              │   │
+│       │     └─────────────────────┬───────────────┘   │
+├───────┼───────────────────────────┼──────────────────┤
+│       │       Native Layer        │                   │
+│       │  ┌────────────────────────▼───────────────┐   │
+│       │  │  yggstack.aar (gomobile Go bindings)    │   │
+│       │  │  - Yggdrasil P2P node                   │   │
+│       │  │  - SOCKS5 proxy (127.0.0.1:1080)        │   │
+│       │  │  - Remote TCP port forwarding           │   │
+│       │  │  - Messenger TCP server (port 7777)     │   │
+│       │  └────────────────────────────────────────┘   │
+└───────┴───────────────────────────────────────────────┘
 ```
 
-You should see the alert pop up where the app is running.
+Messages are JSON-serialized, Ed25519-signed, and sent through the SOCKS5 proxy to the recipient's Yggdrasil IPv6 address on port 7777. The receiving device exposes a local TCP server via Yggdrasil remote port forwarding and emits incoming messages as React Native events.
 
-Of course you should try to fire up the app on all simulators, emulators and phones you have as well. Please note that Calva will only be connected to one of your apps at a time, and it is a bit arbitrary which one. Use `(js/alert)` to check this.
+## Prerequisites
 
-## Using Emacs with CIDER
+- **Java** 11+ (for shadow-cljs)
+- **Node.js** 18+ and npm
+- **Android Studio** with SDK (API 24+) and NDK
+- **Go** 1.20+ (only if rebuilding the yggstack AAR)
+- **Clojure CLI tools** (optional, for linting/formatting)
 
-Open Emacs and a bash shell:
-
-1. Run `npx shadow-cljs compile :app` to perform an initial build of the app.
-1. In Emacs open one of the files in the project (`deps.edn` is fine)
-1. From that buffer, do `cider-jack-in-clojurescript` [C-c M-J] to
-   launch a REPL. Follow the series of interactive prompts in the
-   minibuffer:
-   1. select `shadow-cljs` as the command to launch
-   1. select `shadow` as the repl type
-   1. select `:app` as the build to connect
-   1. and optionally answer `y` or `n` to the final question about
-      opening the `shadow-cljs` UI in a browser.
-   At this point `shadow-cljs` will be watching the project folder and
-   running new builds of the app if any files are changed. You'll also
-   have a REPL prompt, *however the REPL doesn't work because it isn't
-   connected to anything. The app isn't running yet.*
-1. In a shell run `npm run ios` (same as `npx expo start -i`). This starts
-   the Metro bundler, perform the bundling, launch the iPhone
-   simulator, and transmit the bundled app. Be patient at this step as
-   it can take many seconds to complete. When the app is finally
-   running expo will display the message:
-
-       WebSocket connected!
-       REPL init successful
-1. Once you see that the REPL is initalized, you can return to Emacs
-   and confirm the REPL is connected and functional:
-   ``` clojure
-   cljs.user> (js/alert "hello world!")
-   ```
-   Which should pop-up a modal alert in the simulator, confirming the
-   app is running and the REPL is connected end to end.
-
-## Using IntelliJ + Cursive REPL
-
-1. Follow the instructions specified in [Or the Command line](#or-the-command-line).
-2. Create a Maven POM using `shadow-cljs pom`, as described in the [Shadow doc](https://shadow-cljs.github.io/docs/UsersGuide.html#_cursive).
-3. There are now two options
-   1. If you already have a project open, open the project in IntelliJ using _File | New | Project from existing sources..._ and indicating the `pom.xml` file.
-   2. If you're at the welcome screen, press the "Open" button and navigate to the `pom.xml`.
-5. Ensure the project has an SDK configured using _File | Project Structure_, and checking under `Project`.
-7. The project comes with a REPL run configuration called "REPL". Run the REPL using the _Run | Run 'REPL'_ menu item, or the toolbar button.
-8. Run the commands in [Using ClojureScript REPL](#using-clojurescript-repl)
-
-## Or the Command line
-```sh
-$ npm i
-$ npx shadow-cljs watch app
-# wait for first compile to finish or expo gets confused
-# on another terminal tab/window:
-$ npm start
-```
-This will run Expo DevTools at http://localhost:19002/
-
-To run the app in browser using expo-web (react-native-web), press `w` in the same terminal after expo devtools is started.
-This should open the app automatically on your browser after the web version is built. If it does not open automatically, open http://localhost:19006/ manually on your browser.
-
-Note that you can also run the following instead of `npm start` to run the app in browser:
-   ```
-   # same as npx expo start --web
-   $ npm run web
-
-   # or
-
-   # same as npx expo start --web-only
-   $ npm run web-only
-   ```
-
-### Using ClojureScript REPL
-Once the app is deployed and opened in phone/simulator/emulator/browser, connect to nrepl and run the following:
-
-```clojure
-(shadow/nrepl-select :app)
-```
-
-NB: _Calva users don't need to do ^ this ^._
-
-To test the REPL connection:
-
-```clojure
-(js/alert "Hello from Repl")
-```
-
-### Command line CLJS REPL
-
-Shadow can start a CLJS repl for you, if you prefer to stay at the terminal prompt:
+## Getting Started
 
 ```bash
-$ npx shadow-cljs cljs-repl :app
+# 1. Install JS dependencies
+npm i
+
+# 2. Build yggstack AAR (one-time, or after yggstack changes)
+cd vendor/yggstack
+ANDROID_HOME=$HOME/Library/Android/sdk ./mobile/build-android.sh
+cd ../..
+
+# 3. Generate native Android project + copy AAR
+npx expo prebuild
+
+# 4. Start shadow-cljs watch (hot-reload + nREPL)
+npx shadow-cljs watch app
+
+# 5. Build and install on device (in another terminal)
+npx expo run:android
 ```
 
-## Disabling Expo Fast Refresh
+The app will launch on your connected Android device. Open the app and tap **Start** on the Settings screen to begin the Yggdrasil node.
 
-You will need to disable **Fast Refresh** provided by the Expo client, which conflicts with shadow-cljs hot reloading. You really want to use Shadow's, because it is way better and way faster than the Expo stuff is.
+## REPL-Driven Development
 
-For the iOS and Android there is a **Disable Fast Refresh** option in the [development menu](https://docs.expo.io/workflow/debugging/#developer-menu). NB: _Often you need to first enable it and then disable it._
+Vygga supports live code evaluation against a running Android device via shadow-cljs nREPL. See [AGENTS.md](./AGENTS.md) for the full workflow, including multi-device targeting.
 
-For web there may be some way to disable it via a `webpack.config` file as per [this example](https://docs.expo.dev/guides/customizing-webpack/#example). But failing that, once the app has loaded you can block requests to/from `localhost:19006/*` (the Webpack dev server) in devtools [like so](https://github.com/facebook/create-react-app/issues/2519#issuecomment-318867289), for instance by right-clicking on a request in the Network tab, selecting `Block request URL`, then editing the pattern. In Chrome this looks something like:
+Quick check:
+```bash
+echo '@(re-frame.core/subscribe [:yggstack/status])' | bb scripts/nrepl_eval.clj
+```
 
-![image](https://github.com/CarnunMP/rn-rf-shadow/assets/8897392/4d5d9541-f5e4-4108-a38e-65b3c2da4939)
-![image](https://github.com/CarnunMP/rn-rf-shadow/assets/8897392/27c94aa8-3337-4fde-b7f6-7ce87197a89d)
+## Project Structure
 
-This workaround is far from ideal, because the block needs to be manually toggled *off* whenever a full refresh is required (e.g. to load a new file), then back on again. But it seems to do the job.
+```
+src/main/example/      # ClojureScript application source
+  app.cljs             # Entry point, screens, navigation
+  db.cljs              # re-frame app-db schema
+  events.cljs          # Event handlers (Yggdrasil + messenger)
+  subs.cljs            # Subscriptions
+  widgets.cljs         # Reusable UI components
+  yggstack.cljs        # CLJS bridge to Yggdrasil native module
+  messenger.cljs       # CLJS bridge for TCP message server
+  crypto.cljs          # Ed25519 signing/verification
+  storage.cljs         # expo-secure-store key persistence
+  notifications.cljs   # expo-notifications setup
+vendor/yggstack/       # Yggdrasil Go library + build scripts
+plugins/               # Expo config plugin (native module generation)
+scripts/nrepl_eval.clj # Babashka nREPL eval client
+```
 
-## Production builds
+## Production Build
 
-A production build involves first asking shadow-cljs to build a release, then to ask Expo to work in Production Mode.
+```bash
+npx shadow-cljs release app
+npx expo run:android --no-build
+```
 
-1. Kill the watch and expo tasks.
-1. Execute `shadow-cljs release app`
-1. Start the expo task (as per above)
-   1. Enable Production mode.
-   1. Start the app.
+Or use EAS Build with the included `eas-build-pre-install.sh` script (installs JDK 11 on macOS runners for shadow-cljs).
 
-### Using EAS Build
+## Acknowledgments
 
-`expo build` is the classic way of building an Expo app, and `eas build` is the new version of `expo build`. Using EAS Build currently requires an Expo account with a paid plan subscription.
-
-The steps below provide an example of using EAS Build to build an apk file to run on an Android emulator or device.
-
-0. Install the latest EAS CLI by running `npm install -g eas-cli`
-0. Log into your Expo account
-0. Configure EAS Build in your project with `eas build:configure`.
-0. Make your eas.json file contents look like this:
-    ```json
-    {
-      "build": {
-        "production": {},
-        "development": {
-          "distribution": "internal",
-          "android": {
-            "buildType": "apk"
-          },
-          "ios": {
-            "simulator": true
-          }
-        }
-      }
-    }
-    ```
-0. Commit your changes, run `eas build --profile development`, and follow the prompts.
-0. Navigate to the URL given by the command to monitor the build. When it completes, download the apk and install it on your device or emulator.
-
-See [the EAS Build docs](https://docs.expo.dev/build/introduction/) for more information.
-
-If you want to use EAS Build with a project not based on this template, see [this PR](https://github.com/PEZ/rn-rf-shadow/pull/24) for information about how your project can be set up to avoid an error during the build process.
-
-Note: The `eas-build-pre-install.sh` script makes EAS install Java in the MacOS environment when running a build for iOS. This ensures that shadow-cljs can be run in the EAS pipeline to build your ClojureScript code.
-
-## React Navigation included
-
-The app is setup to use [React Navigation](https://reactnavigation.org/). If you don't need that in your app, just remove it.
-
-## Happy Hacking! ❤️
-
-Please don't hesitate to star the project repository.
+This project is built on the [rn-rf-shadow](https://github.com/PEZ/rn-rf-shadow) template — the fastest way to get ClojureScript + React Native + Reagent + re-frame up and running. The Yggdrasil integration uses [yggstack](https://github.com/DrewCyber/yggstack), Go bindings for the [Yggdrasil Network](https://yggdrasil-network.github.io/).
