@@ -1,4 +1,4 @@
-(ns example.widgets
+(ns vygga.widgets
   (:require ["react-native" :as rn]))
 
 (defn button [{:keys [style text-style on-press

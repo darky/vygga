@@ -1,4 +1,4 @@
-(ns example.yggstack
+(ns vygga.yggstack
   (:require [re-frame.core :as rf]
             [clojure.string :as str]
             ["expo-notifications" :as Notifications]

@@ -1,4 +1,4 @@
-(ns example.messenger
+(ns vygga.messenger
   (:require [re-frame.core :as rf]
             ["react-native" :as rn]))
 

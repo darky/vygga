@@ -1,4 +1,4 @@
-(ns example.crypto
+(ns vygga.crypto
   (:require ["tweetnacl" :as nacl]))
 
 (defn hex->bytes

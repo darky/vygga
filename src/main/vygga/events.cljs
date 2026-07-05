@@ -1,14 +1,14 @@
-(ns example.events
+(ns vygga.events
   (:require
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
-   [example.yggstack :as ygg]
-   [example.messenger :as msg]
-   [example.notifications :as notifications]
-   [example.persist :as persist]
-   [example.storage :as storage]
-   [example.crypto :as crypto]
-   [example.db :as db :refer [app-db]]))
+   [vygga.yggstack :as ygg]
+   [vygga.messenger :as msg]
+   [vygga.notifications :as notifications]
+   [vygga.persist :as persist]
+   [vygga.storage :as storage]
+   [vygga.crypto :as crypto]
+   [vygga.db :as db :refer [app-db]]))
 
 (def page-size 50)
 (defonce ^:private contact-msgs-cache (atom {}))

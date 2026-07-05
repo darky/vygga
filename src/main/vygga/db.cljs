@@ -1,4 +1,4 @@
-(ns example.db)
+(ns vygga.db)
 
 (defonce default-peers
   ["tls://45.95.202.21:443"

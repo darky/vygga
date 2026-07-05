@@ -1,7 +1,7 @@
-(ns example.persist
+(ns vygga.persist
   (:require ["expo-secure-store" :as secure-store]
             ["@react-native-async-storage/async-storage" :default async-storage]
-            [example.crypto :as crypto]))
+            [vygga.crypto :as crypto]))
 
 (def encryption-key "messenger_encryption_key")
 (def messenger-meta-key "messenger_meta")

@@ -1,4 +1,4 @@
-(ns example.notifications
+(ns vygga.notifications
   (:require ["expo-notifications" :as Notifications]))
 
 (defonce channel-created (atom false))

@@ -1,4 +1,4 @@
-(ns example.storage
+(ns vygga.storage
   (:require ["expo-secure-store" :as secure-store]))
 
 (def ygg-private-key "ygg_private_key")

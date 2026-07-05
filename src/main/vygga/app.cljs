@@ -1,8 +1,8 @@
-(ns example.app
-  (:require [example.events]
-            [example.subs]
-            [example.notifications :as notifications]
-            [example.widgets :refer [button]]
+(ns vygga.app
+  (:require [vygga.events]
+            [vygga.subs]
+            [vygga.notifications :as notifications]
+            [vygga.widgets :refer [button]]
             [expo.root :as expo-root]
             ["expo-status-bar" :refer [StatusBar]]
             [re-frame.core :as rf]
