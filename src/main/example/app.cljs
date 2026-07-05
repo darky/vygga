@@ -147,9 +147,8 @@
 
 ;; ---- Contact List Screen ----
 
-(defn- contact-item [^js props contact-id {:keys [name address messages]}]
-  (let [last-msg (last messages)
-        preview (if last-msg (:text last-msg) "")]
+(defn- contact-item [^js props contact-id {:keys [name address last-message]}]
+  (let [preview (when last-message (:text last-message) "")]
     [:> rn/TouchableOpacity
      {:key contact-id
       :style {:flex-direction :row :align-items :center
@@ -178,7 +177,6 @@
                *new-addr (r/atom "")]
     [:> rn/View {:style {:flex 1 :background-color :white}}
      [status-indicator props]
-     ;; Server status bar
      [:> rn/View {:style {:flex-direction :row :align-items :center
                           :justify-content :space-between
                           :padding-horizontal 16 :padding-vertical 10
@@ -199,7 +197,6 @@
                                 :border-color (if @server-running "#F44336" "#4CAF50")}}
        [:> rn/Text {:style {:font-size 12 :color (if @server-running "#F44336" "#4CAF50")}}
         (if @server-running "Stop" "Start")]]]
-     ;; Contact list
      [:> rn/ScrollView {:style {:flex 1}}
       (let [sorted (sort-by (fn [[_ c]] (:name c)) (vec @contacts-map))]
         (if (empty? sorted)
@@ -209,14 +206,12 @@
           (doall
            (for [[cid c] sorted]
              ^{:key cid} [contact-item props cid c]))))]
-     ;; FAB to add contact
      [:> rn/Pressable {:style {:position :absolute :bottom 20 :right 20
                                :width 56 :height 56 :border-radius 28
                                :background-color :blue :justify-content :center
                                :align-items :center :elevation 4}
                        :on-press #(reset! *show-add true)}
       [:> rn/Text {:style {:color :white :font-size 28}} "+"]]
-     ;; Add contact dialog
      (when @*show-add
        [:> rn/View {:style {:position :absolute :top 0 :left 0 :right 0 :bottom 0
                             :background-color "rgba(0,0,0,0.5)"
@@ -254,67 +249,108 @@
                                           (reset! *show-add false)))}
            [:> rn/Text {:style {:color :white :font-weight :600}} "Add"]]]]])
      [:> StatusBar {:style "auto"}]]))
+
 ;; ---- Chat Screen ----
+
+(defn- msg->js
+  [m]
+  #js {:id (:id m)
+       :text (:text m)
+       :fromMe (:from-me m)
+       :status (when (:status m) (name (:status m)))
+       :ts (:ts m)})
+
+(defn- message-bubble [{:keys [id text from-me status cid]}]
+  [:> rn/View {:style {:align-items (if from-me :flex-end :flex-start)
+                       :margin-bottom 8}}
+   [:> rn/View {:style {:max-width "75%"
+                        :background-color (if from-me "#007AFF" "#E8E8E8")
+                        :border-radius 16 :padding 12}}
+    [:> rn/Text {:style {:font-size 15
+                         :color (if from-me :white "#333")}}
+     text]
+    (when (and from-me (= status :sent))
+      [:> rn/Text {:style {:font-size 12 :color "#8ED1FF"
+                           :text-align :right :margin-top 4}}
+       "✓"])]
+   (when (and from-me (= status :failed))
+     [:> rn/View {:style {:flex-direction :row :align-items :center
+                          :margin-top 4}}
+      [:> rn/Text {:style {:font-size 12 :color "#F44336" :margin-right 8}}
+       "! Failed"]
+      [:> rn/TouchableOpacity {:on-press #(rf/dispatch [:messenger/resend-message cid id])
+                               :style {:padding-horizontal 10 :padding-vertical 4
+                                       :border-radius 8 :border-width 1
+                                       :border-color "#F44336"}}
+       [:> rn/Text {:style {:font-size 12 :color "#F44336" :font-weight :600}}
+        "Resend"]]])])
 
 (defn- chat []
   (r/with-let [current-id (rf/subscribe [:messenger/current-contact])
                contacts (rf/subscribe [:messenger/contacts])
+               has-more (rf/subscribe [:messenger/current-has-more])
+               messages-loading (rf/subscribe [:messenger/messages-loading])
                *text (r/atom "")
-               *scroll-ref (r/atom nil)]
+               *flat-ref (r/atom nil)
+               *at-bottom (r/atom true)
+               *loaded-contact (r/atom nil)]
     (let [cid @current-id
           c (get @contacts cid)
           msgs (:messages c [])
+          has-more? @has-more
+          loading? @messages-loading
           insets (useSafeAreaInsets)]
+      (when (and cid (not= cid @*loaded-contact))
+        (reset! *loaded-contact cid)
+        (rf/dispatch [:messenger/load-contact-messages]))
       [:> rn/View {:style {:flex 1 :background-color :white}}
-       ;; Header
        [:> rn/View {:style {:padding-horizontal 16 :padding-vertical 12
                             :border-bottom-width 1 :border-bottom-color "#e0e0e0"
                             :flex-direction :row :align-items :center}}
         [:> rn/Text {:style {:font-size 17 :font-weight :600 :flex 1}}
          (or (:name c) "Unknown")]
         [:> rn/Text {:style {:font-size 12 :color "#999"}} (:address c)]]
-       ;; Messages
-       [:> rn/ScrollView {:style {:flex 1 :padding 12}
-                          :ref #(reset! *scroll-ref %)
-                          :on-content-size-change (fn []
-                                                    (when-let [s @*scroll-ref]
-                                                      (try (.scrollToEnd s #js {:animated false})
-                                                           (catch js/Error _))))}
-        (if (empty? msgs)
-          [:> rn/View {:style {:padding 40 :align-items :center}}
-           [:> rn/Text {:style {:font-size 15 :color "#999"}}
-            "No messages yet"]]
-          (into []
-                (for [m msgs
-                      :let [id (:id m)
-                            text (:text m)
-                            from-me (:from-me m)
-                            status (:status m)]]
-                  [:> rn/View {:key id
-                               :style {:align-items (if from-me :flex-end :flex-start)
-                                       :margin-bottom 8}}
-                   [:> rn/View {:style {:max-width "75%"
-                                        :background-color (if from-me "#007AFF" "#E8E8E8")
-                                        :border-radius 16 :padding 12}}
-                    [:> rn/Text {:style {:font-size 15
-                                         :color (if from-me :white "#333")}}
-                     text]
-                    (when (and from-me (= status :sent))
-                      [:> rn/Text {:style {:font-size 12 :color "#8ED1FF"
-                                           :text-align :right :margin-top 4}}
-                       "✓"])]
-                   (when (and from-me (= status :failed))
-                     [:> rn/View {:style {:flex-direction :row :align-items :center
-                                          :margin-top 4}}
-                      [:> rn/Text {:style {:font-size 12 :color "#F44336" :margin-right 8}}
-                       "! Failed"]
-                      [:> rn/TouchableOpacity {:on-press #(rf/dispatch [:messenger/resend-message cid id])
-                                               :style {:padding-horizontal 10 :padding-vertical 4
-                                                       :border-radius 8 :border-width 1
-                                                       :border-color "#F44336"}}
-                       [:> rn/Text {:style {:font-size 12 :color "#F44336" :font-weight :600}}
-                        "Resend"]]])])))]
-       ;; Input bar
+       (if (empty? msgs)
+         [:> rn/View {:style {:flex 1 :padding 40 :align-items :center}}
+          [:> rn/Text {:style {:font-size 15 :color "#999"}}
+           (if loading? "Loading..." "No messages yet")]]
+         [:> rn/FlatList
+          {:data (clj->js (mapv msg->js (reverse msgs)))
+           :key-extractor (fn [item] (.-id item))
+           :inverted true
+           :ref #(reset! *flat-ref %)
+           :style {:flex 1 :padding 12}
+           :on-content-size-change (fn []
+                                     (when (and @*at-bottom @*flat-ref)
+                                       (try (.scrollToEnd @*flat-ref #js {:animated false})
+                                            (catch js/Error _))))
+           :on-scroll (fn [e]
+                        (let [offset (.-y (.-contentOffset e))]
+                          (reset! *at-bottom (< offset 50))))
+           :on-end-reached (fn []
+                             (when has-more?
+                               (rf/dispatch [:messenger/load-older-messages])))
+           :on-end-reached-threshold 0.3
+           :initial-num-to-render 20
+           :max-to-render-per-batch 20
+           :window-size 7
+           :ListFooterComponent (when has-more?
+                                  (fn []
+                                    (r/as-element
+                                     [:> rn/View {:style {:padding 20 :align-items :center}}
+                                      [:> rn/Text {:style {:font-size 13 :color "#999"}}
+                                       (if loading? "Loading..." "Pull up to load more")]])))
+           :render-item (fn [info]
+                          (let [item (.-item info)
+                                id (.-id item)
+                                text (.-text item)
+                                from-me (.-fromMe item)
+                                status (when (.-status item) (keyword (.-status item)))]
+                            (r/as-element
+                             [message-bubble
+                              {:id id :text text :from-me from-me
+                               :status status :cid cid
+                               :on-resend #(rf/dispatch [:messenger/resend-message cid id])}])))}])
        [:> rn/View {:style {:flex-direction :row :align-items :center
                             :padding 12 :border-top-width 1
                             :border-top-color "#e0e0e0"

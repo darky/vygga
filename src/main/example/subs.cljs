@@ -59,3 +59,29 @@
  :messenger/current-contact
  (fn [db _]
    (get-in db [:messenger :current-contact])))
+
+(rf/reg-sub
+ :messenger/current-messages
+ :<- [:messenger/current-contact]
+ :<- [:messenger/contacts]
+ (fn [[cid contacts] _]
+   (get-in contacts [cid :messages] [])))
+
+(rf/reg-sub
+ :messenger/current-contact-info
+ :<- [:messenger/current-contact]
+ :<- [:messenger/contacts]
+ (fn [[cid contacts] _]
+   (get contacts cid)))
+
+(rf/reg-sub
+ :messenger/current-has-more
+ :<- [:messenger/current-contact]
+ :<- [:messenger/contacts]
+ (fn [[cid contacts] _]
+   (get-in contacts [cid :has-more?] false)))
+
+(rf/reg-sub
+ :messenger/messages-loading
+ (fn [db _]
+   (get-in db [:messenger :messages-loading] false)))
