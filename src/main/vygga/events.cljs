@@ -555,61 +555,55 @@
 (rf/reg-event-fx
  :messenger/receive-incoming
  (fn [{db :db} [_ from-addr text id ts pubkey sig]]
-   (let [seen-ids (get-in db [:messenger :seen-ids] #{})]
-     (cond
-       (seen-ids id)
-       (js/console.warn "Rejected duplicate message:" id)
+   (cond
+     (not (and pubkey sig))
+     (js/console.warn "Rejected unsigned message from" from-addr)
 
-       (not (and pubkey sig))
-       (js/console.warn "Rejected unsigned message from" from-addr)
-
-       :else
-       (let [data-to-verify (str text "|" id "|" ts)]
-         (if (crypto/verify-signature pubkey data-to-verify sig)
-           (let [contacts (get-in db [:messenger :contacts])
-                 [contact-id existing]
-                 (reduce-kv (fn [[_ found] cid c]
-                              (if found [cid true]
-                                  (if (= (:address c) from-addr)
-                                    [cid true] nil)))
-                            [nil false] contacts)
-                 pubkey-mismatch (and existing
-                                      (get-in contacts [contact-id :public-key])
-                                      (not= pubkey (get-in contacts [contact-id :public-key])))
-                 contact-id (or contact-id from-addr)
-                 sender-name (if-let [c (get contacts contact-id)]
-                               (:name c)
-                               (str "unknown-" (subs from-addr 0 8)))
-                 new-msg {:text text :from-me false
-                          :id id :ts ts}]
-             (if pubkey-mismatch
-               (js/console.warn "Public key mismatch for" from-addr)
-               (do
-                 (notifications/show! {:title sender-name :body text})
-                 (if existing
-                   {:db (-> db
-                            (update-in [:messenger :contacts contact-id :messages]
-                                       (fn [msgs] (conj (vec msgs) new-msg)))
-                            (assoc-in [:messenger :seen-ids] (conj seen-ids id))
-                            (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
-                    :persist/messenger-meta nil
-                    :persist/messenger-write {:contact-id contact-id
-                                              :index-entry {:id id :ts ts}
-                                              :msg new-msg}}
-                   {:db (-> db
-                            (assoc-in [:messenger :seen-ids] (conj seen-ids id))
-                            (assoc-in [:messenger :contacts from-addr]
-                                      {:name sender-name
-                                       :address from-addr
-                                       :public-key pubkey
-                                       :messages [new-msg]
-                                       :message-index [{:id id :ts ts}]
-                                       :consumed-count 1
-                                       :total-count 1
-                                       :pending-chunks []
-                                       :has-more? false}))
-                    :persist/messenger-meta nil
-                    :persist/messenger-write {:contact-id from-addr
-                                              :index-entry {:id id :ts ts}
-                                              :msg new-msg}}))))
-           (js/console.warn "Invalid signature from" from-addr)))))))
+     :else
+     (let [data-to-verify (str text "|" id "|" ts)]
+       (if (crypto/verify-signature pubkey data-to-verify sig)
+         (let [contacts (get-in db [:messenger :contacts])
+               [contact-id existing]
+               (reduce-kv (fn [[_ found] cid c]
+                            (if found [cid true]
+                                (if (= (:address c) from-addr)
+                                  [cid true] nil)))
+                          [nil false] contacts)
+               pubkey-mismatch (and existing
+                                    (get-in contacts [contact-id :public-key])
+                                    (not= pubkey (get-in contacts [contact-id :public-key])))
+               contact-id (or contact-id from-addr)
+               sender-name (if-let [c (get contacts contact-id)]
+                             (:name c)
+                             (str "unknown-" (subs from-addr 0 8)))
+               new-msg {:text text :from-me false
+                        :id id :ts ts}]
+           (if pubkey-mismatch
+             (js/console.warn "Public key mismatch for" from-addr)
+             (do
+               (notifications/show! {:title sender-name :body text})
+               (if existing
+                 {:db (-> db
+                          (update-in [:messenger :contacts contact-id :messages]
+                                     (fn [msgs] (conj (vec msgs) new-msg)))
+                          (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
+                  :persist/messenger-meta nil
+                  :persist/messenger-write {:contact-id contact-id
+                                            :index-entry {:id id :ts ts}
+                                            :msg new-msg}}
+                 {:db (-> db
+                          (assoc-in [:messenger :contacts from-addr]
+                                    {:name sender-name
+                                     :address from-addr
+                                     :public-key pubkey
+                                     :messages [new-msg]
+                                     :message-index [{:id id :ts ts}]
+                                     :consumed-count 1
+                                     :total-count 1
+                                     :pending-chunks []
+                                     :has-more? false}))
+                  :persist/messenger-meta nil
+                  :persist/messenger-write {:contact-id from-addr
+                                            :index-entry {:id id :ts ts}
+                                            :msg new-msg}}))))
+         (js/console.warn "Invalid signature from" from-addr))))))

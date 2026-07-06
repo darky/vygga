@@ -63,17 +63,17 @@
   (-> (load-and-decrypt messenger-meta-key)
       (.then (fn [data]
                (when data
-                 (update data :seen-ids set))))))
+                 data)))))
 
 ;; ---- Per-message storage ----
 
-(defn- msg-key [cid msg-id]
+(defn msg-key [cid msg-id]
   (str msg-key-prefix cid "_" msg-id))
 
-(defn- idx-key [cid chunk]
+(defn idx-key [cid chunk]
   (str idx-key-prefix cid "_" chunk))
 
-(defn- manifest-key [cid]
+(defn manifest-key [cid]
   (str idx-key-prefix cid "_manifest"))
 
 (defn save-message!

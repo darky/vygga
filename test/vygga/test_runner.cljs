@@ -8,7 +8,7 @@
    [vygga.events-test]
    [vygga.subs-test]))
 
-(defn -main [& args]
+(defn -main [& _]
   (run-tests
    'vygga.crypto-test
    'vygga.core-test

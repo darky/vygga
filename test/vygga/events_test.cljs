@@ -5,9 +5,7 @@
    [re-frame.db :as rdb]
    [vygga.db :refer [app-db default-peers]]
    [vygga.crypto :as crypto]
-   [vygga.events]
-   [vygga.messenger :as msg]
-   [vygga.yggstack :as ygg]))
+    [vygga.events]))
 
 (def captured (atom {}))
 
@@ -232,21 +230,12 @@
       (is (= true (get-in @rdb/app-db [:messenger :contacts cid :has-more?]))))))
 
 (deftest test-messenger-restore-meta
-  (let [data {:seen-ids #{"id1" "id2"}
-              :contacts {"cid1" {:name "Alice" :address "201::1"}}}]
+  (let [data {:contacts {"cid1" {:name "Alice" :address "201::1"}}}]
     (rf/dispatch-sync [:messenger/restore-meta data])
     (let [msngr (:messenger @rdb/app-db)]
-      (is (= #{"id1" "id2"} (:seen-ids msngr)))
       (is (contains? (:contacts msngr) "cid1"))
       (is (= "Alice" (get-in (:contacts msngr) ["cid1" :name])))
       (is (= [] (get-in (:contacts msngr) ["cid1" :messages]))))))
-
-(deftest test-messenger-receive-incoming-duplicate
-  (let [db-with-seen (assoc-in app-db [:messenger :seen-ids] #{"dup-id"})]
-    (reset! rdb/app-db db-with-seen)
-    (rf/dispatch-sync [:messenger/receive-incoming
-                       "201::1" "hi" "dup-id" 100 nil nil])
-    (is (= #{"dup-id"} (get-in @rdb/app-db [:messenger :seen-ids])))))
 
 (deftest test-messenger-receive-incoming-unsigned
   (rf/dispatch-sync [:messenger/receive-incoming
@@ -271,7 +260,6 @@
       (rf/dispatch-sync [:messenger/receive-incoming
                          "201:aaaa::1" text msg-id ts pubkey sig])
       (let [contacts (get-in @rdb/app-db [:messenger :contacts])
-            cid (first (keys contacts))
             contact (val (first contacts))]
         (is (= 1 (count contacts)))
         (is (some? contact))
@@ -288,8 +276,7 @@
             db-with-contact (-> app-db
                                 (assoc-in [:messenger :contacts existing-cid]
                                           {:name "Bob" :address address
-                                           :messages [{:text "prev"}]})
-                                (assoc-in [:messenger :seen-ids] #{}))]
+                                           :messages [{:text "prev"}]}))]
         (reset! rdb/app-db db-with-contact)
         (rf/dispatch-sync [:messenger/receive-incoming
                            address msg2-text msg2-id msg2-ts pubkey sig2])

@@ -22,8 +22,7 @@
       (is (= 7777 (:server-port msgr)))
       (is (false? (:server-running msgr)))
       (is (map? (:contacts msgr)))
-      (is (nil? (:current-contact msgr)))
-      (is (set? (:seen-ids msgr))))))
+      (is (nil? (:current-contact msgr))))))
 
 (deftest test-default-peers
   (testing "default-peers count and format"
