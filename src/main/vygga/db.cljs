@@ -16,4 +16,5 @@
                  :messenger {:server-port 7777
                              :server-running false
                              :contacts {}
+                             :contact-addr-index {}
                              :current-contact nil}})

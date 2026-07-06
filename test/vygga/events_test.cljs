@@ -127,13 +127,16 @@
 (deftest test-messenger-add-contact
   (let [contact {:name "Alice" :address "201:abcd::1"}]
     (rf/dispatch-sync [:messenger/add-contact contact])
-    (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
+    (let [contacts (get-in @rdb/app-db [:messenger :contacts])
+          addr-index (get-in @rdb/app-db [:messenger :contact-addr-index])]
       (is (= 1 (count contacts)))
+      (is (= (ffirst contacts) (get addr-index "201:abcd::1")))
       (let [[cid c] (first contacts)]
         (is (string? cid))
         (is (= "Alice" (:name c)))
         (is (= "201:abcd::1" (:address c)))
-        (is (= [] (:messages c))))))
+        (is (= [] (:messages c)))
+        (is (= {} (:msg-index c))))))
   (is (contains? @captured :messenger/save-contacts)))
 
 (deftest test-messenger-set-current-contact
@@ -168,7 +171,8 @@
         db-with-sending (-> app-db
                             (assoc-in [:messenger :contacts cid]
                                       {:messages [{:id msg-id :text "hi"
-                                                   :from-me true :status :sending}]}))]
+                                                   :from-me true :status :sending}]
+                                       :msg-index {msg-id 0}}))]
     (reset! rdb/app-db db-with-sending)
     (rf/dispatch-sync [:messenger/message-sent cid msg-id])
     (let [msg (first (get-in @rdb/app-db [:messenger :contacts cid :messages]))]
@@ -180,7 +184,8 @@
         db-with-sending (-> app-db
                             (assoc-in [:messenger :contacts cid]
                                       {:messages [{:id msg-id :text "hi"
-                                                   :from-me true :status :sending}]}))]
+                                                   :from-me true :status :sending}]
+                                       :msg-index {msg-id 0}}))]
     (reset! rdb/app-db db-with-sending)
     (rf/dispatch-sync [:messenger/message-failed cid msg-id])
     (let [msg (first (get-in @rdb/app-db [:messenger :contacts cid :messages]))]
@@ -233,7 +238,9 @@
             db-with-contact (-> app-db
                                 (assoc-in [:messenger :contacts existing-cid]
                                           {:name "Bob" :address address
-                                           :messages [{:text "prev"}]}))]
+                                           :messages [{:text "prev"}]})
+                                (assoc-in [:messenger :contact-addr-index address]
+                                          existing-cid))]
         (reset! rdb/app-db db-with-contact)
         (reset! captured {})
         (rf/dispatch-sync [:messenger/receive-incoming

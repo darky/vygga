@@ -211,9 +211,11 @@
  :messenger/add-contact
  (fn [{db :db} [_ {:keys [id name address]}]]
    (let [cid (or id (str (random-uuid)))]
-     {:db (assoc-in db [:messenger :contacts cid]
-                    {:name name :address address
-                     :messages []})
+     {:db (-> db
+              (assoc-in [:messenger :contacts cid]
+                        {:name name :address address
+                         :messages [] :msg-index {}})
+              (assoc-in [:messenger :contact-addr-index address] cid))
       :messenger/save-contacts nil})))
 
 (rf/reg-event-fx
@@ -242,7 +244,7 @@
  (fn [_]
    (let [contacts (get-in @rdb/app-db [:messenger :contacts])
          stripped (reduce-kv (fn [acc k v]
-                               (assoc acc k (dissoc v :messages)))
+                               (assoc acc k (dissoc v :messages :msg-index)))
                              {} contacts)]
      (-> (secure-store/setItemAsync "vygga_contacts" (pr-str stripped))
          (.catch (fn [e]
@@ -293,16 +295,19 @@
               :id msg-id :ts ts
               :status :sending}]
      (if (and address text (seq text))
-       {:db (update-in db [:messenger :contacts contact-id :messages]
-                       (fn [msgs] (conj (vec msgs) msg)))
-        :messenger/send-via-socks {:address address
-                                   :my-address my-address
-                                   :private-key private-key
-                                   :public-key public-key
-                                   :contact-id contact-id
-                                   :text text
-                                   :msg-id msg-id
-                                   :ts ts}}
+       (let [msgs (get-in db [:messenger :contacts contact-id :messages])
+             idx (count msgs)]
+         {:db (-> db
+                  (assoc-in [:messenger :contacts contact-id :messages] (conj msgs msg))
+                  (assoc-in [:messenger :contacts contact-id :msg-index msg-id] idx))
+          :messenger/send-via-socks {:address address
+                                     :my-address my-address
+                                     :private-key private-key
+                                     :public-key public-key
+                                     :contact-id contact-id
+                                     :text text
+                                     :msg-id msg-id
+                                     :ts ts}})
        (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx
@@ -327,22 +332,14 @@
 (rf/reg-event-db
  :messenger/message-sent
  (fn [db [_ contact-id msg-id]]
-   (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs]
-                (mapv (fn [m] (if (= (:id m) msg-id)
-                                (assoc m :status :sent)
-                                m))
-                      msgs)))))
+   (let [idx (get-in db [:messenger :contacts contact-id :msg-index msg-id])]
+     (assoc-in db [:messenger :contacts contact-id :messages idx :status] :sent))))
 
 (rf/reg-event-db
  :messenger/message-failed
  (fn [db [_ contact-id msg-id]]
-   (update-in db [:messenger :contacts contact-id :messages]
-              (fn [msgs]
-                (mapv (fn [m] (if (= (:id m) msg-id)
-                                (assoc m :status :failed)
-                                m))
-                      msgs)))))
+   (let [idx (get-in db [:messenger :contacts contact-id :msg-index msg-id])]
+     (assoc-in db [:messenger :contacts contact-id :messages idx :status] :failed))))
 
 (rf/reg-event-fx
  :messenger/resend-message
@@ -352,26 +349,20 @@
          my-address (get-in db [:yggstack :address])
          private-key (get-in db [:yggstack :private-key])
          public-key (get-in db [:yggstack :public-key])
-         msgs (get-in db [:messenger :contacts contact-id :messages])
-         msg (some #(when (= (:id %) msg-id) %) msgs)
+         idx (get-in db [:messenger :contacts contact-id :msg-index msg-id])
+         msg (get-in db [:messenger :contacts contact-id :messages idx])
          text (:text msg)
          ts (:ts msg)]
      (if (and address text (seq text))
-       (let [db' (update-in db [:messenger :contacts contact-id :messages]
-                            (fn [msgs]
-                              (mapv (fn [m] (if (= (:id m) msg-id)
-                                              (assoc m :status :sending)
-                                              m))
-                                    msgs)))]
-         {:db db'
-          :messenger/send-via-socks {:address address
-                                     :my-address my-address
-                                     :private-key private-key
-                                     :public-key public-key
-                                     :contact-id contact-id
-                                     :text text
-                                     :msg-id msg-id
-                                     :ts ts}})
+       {:db (assoc-in db [:messenger :contacts contact-id :messages idx :status] :sending)
+        :messenger/send-via-socks {:address address
+                                   :my-address my-address
+                                   :private-key private-key
+                                   :public-key public-key
+                                   :contact-id contact-id
+                                   :text text
+                                   :msg-id msg-id
+                                   :ts ts}}
        (js/console.warn "Cannot resend: missing address or text")))))
 
 (rf/reg-event-fx
@@ -384,17 +375,12 @@
      :else
      (let [data-to-verify (str text "|" id "|" ts)]
        (if (crypto/verify-signature pubkey data-to-verify sig)
-         (let [contacts (get-in db [:messenger :contacts])
-               [contact-id existing]
-               (reduce-kv (fn [[_ found] cid c]
-                            (if found [cid true]
-                                (if (= (:address c) from-addr)
-                                  [cid true] nil)))
-                          [nil false] contacts)
-               pubkey-mismatch (and existing
+         (let [addr-index (get-in db [:messenger :contact-addr-index])
+               contact-id (get addr-index from-addr)
+               contacts (get-in db [:messenger :contacts])
+               pubkey-mismatch (and contact-id
                                     (get-in contacts [contact-id :public-key])
                                     (not= pubkey (get-in contacts [contact-id :public-key])))
-               contact-id (or contact-id from-addr)
                sender-name (if-let [c (get contacts contact-id)]
                              (:name c)
                              (str "unknown-" (subs from-addr 0 8)))
@@ -404,16 +390,21 @@
              (js/console.warn "Public key mismatch for" from-addr)
              (do
                (notifications/show! {:title sender-name :body text})
-               (if existing
+               (if contact-id
+                 (let [msgs (get-in db [:messenger :contacts contact-id :messages])
+                       idx (count msgs)]
+                   {:db (-> db
+                            (assoc-in [:messenger :contacts contact-id :messages] (conj msgs new-msg))
+                            (assoc-in [:messenger :contacts contact-id :msg-index id] idx)
+                            (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
+                    :messenger/save-contacts nil})
                  {:db (-> db
-                          (update-in [:messenger :contacts contact-id :messages]
-                                     (fn [msgs] (conj (vec msgs) new-msg)))
-                          (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
-                  :messenger/save-contacts nil}
-                 {:db (assoc-in db [:messenger :contacts from-addr]
-                                {:name sender-name
-                                 :address from-addr
-                                 :public-key pubkey
-                                 :messages [new-msg]})
+                          (assoc-in [:messenger :contacts from-addr]
+                                    {:name sender-name
+                                     :address from-addr
+                                     :public-key pubkey
+                                     :messages [new-msg]
+                                     :msg-index {id 0}})
+                          (assoc-in [:messenger :contact-addr-index from-addr] from-addr))
                   :messenger/save-contacts nil}))))
          (js/console.warn "Invalid signature from" from-addr))))))

@@ -40,3 +40,10 @@
  :messenger/current-contact
  (fn [db _]
    (get-in db [:messenger :current-contact])))
+
+(rf/reg-sub
+ :messenger/sorted-contacts
+ (fn [db _]
+   (->> (get-in db [:messenger :contacts])
+        (sort-by (fn [[_ c]] (:name c)))
+        (vec))))

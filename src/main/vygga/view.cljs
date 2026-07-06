@@ -161,7 +161,7 @@
     (contact-item-render props contact-id {:name name :address address :last-message last-message} t)))
 
 (defn contacts [props]
-  (r/with-let [contacts-map (rf/subscribe [:messenger/contacts])
+  (r/with-let [sorted-contacts (rf/subscribe [:messenger/sorted-contacts])
                server-running (rf/subscribe [:messenger/server-running])
                *show-add (r/atom false)
                *new-name (r/atom "")
@@ -190,7 +190,7 @@
        [:> rn/Text {:style {:font-size 12 :color (if @server-running (:error t) (:success t))}}
         (if @server-running "Stop" "Start")]]]
      [:> rn/ScrollView {:style {:flex 1 :padding-bottom 90}}
-      (let [sorted (sort-by (fn [[_ c]] (:name c)) (vec @contacts-map))]
+      (let [sorted @sorted-contacts]
         (if (empty? sorted)
           [:> rn/View {:style {:padding 40 :align-items :center}}
            [:> rn/Text {:style {:font-size 16 :color (:empty-text t)}}
@@ -298,31 +298,31 @@
           [:> rn/Text {:style {:font-size 15 :color (:empty-text t)}}
            "No messages yet"]]
          [:> rn/FlatList
-           {:data (to-array (reverse msgs))
-            :key-extractor (fn [item] (.-id item))
-            :inverted true
-            :ref #(reset! *flat-ref %)
-            :style {:flex 1 :padding 12}
-            :on-content-size-change (fn []
-                                      (when (and @*at-bottom @*flat-ref)
-                                        (try (.scrollToEnd @*flat-ref #js {:animated false})
-                                             (catch js/Error _))))
-            :on-scroll (fn [e]
-                         (let [offset (.-y (.-contentOffset e))]
-                           (reset! *at-bottom (< offset 50))))
-            :initial-num-to-render 20
-            :max-to-render-per-batch 20
-            :window-size 7
-            :render-item (fn [info]
-                           (let [item (.-item info)
-                                 id (:id item)
-                                 text (:text item)
-                                 from-me (:from-me item)
-                                 status (:status item)]
-                             (r/as-element
-                              [message-bubble
-                               {:id id :text text :from-me from-me
-                                :status status :cid cid}])))}])
+          {:data (to-array (rseq msgs))
+           :key-extractor (fn [item] (.-id item))
+           :inverted true
+           :ref #(reset! *flat-ref %)
+           :style {:flex 1 :padding 12}
+           :on-content-size-change (fn []
+                                     (when (and @*at-bottom @*flat-ref)
+                                       (try (.scrollToEnd @*flat-ref #js {:animated false})
+                                            (catch js/Error _))))
+           :on-scroll (fn [e]
+                        (let [offset (.-y (.-contentOffset e))]
+                          (reset! *at-bottom (< offset 50))))
+           :initial-num-to-render 20
+           :max-to-render-per-batch 20
+           :window-size 7
+           :render-item (fn [info]
+                          (let [item (.-item info)
+                                id (:id item)
+                                text (:text item)
+                                from-me (:from-me item)
+                                status (:status item)]
+                            (r/as-element
+                             [message-bubble
+                              {:id id :text text :from-me from-me
+                               :status status :cid cid}])))}])
        [:> rn/View {:style {:flex-direction :row :align-items :center
                             :padding 12 :border-top-width 1
                             :border-top-color (:border t)

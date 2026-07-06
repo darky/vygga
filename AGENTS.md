@@ -80,6 +80,26 @@ bb check-format
 bb fix-format
 ```
 
+## Performance: Choose the Right Data Structure
+
+Re-frame event handlers run on every dispatch — O(n) scans in hot paths
+compound as conversations grow. Follow these principles:
+
+1. **Index what you look up by.** If you find a message by `:id`, store
+   `{:messages [...], :msg-index {id -> idx}}` for O(1) updates instead of
+   scanning every message with `mapv` or `some`. Same for contact-by-address
+   lookups — a reverse index map turns O(n) into O(1).
+2. **Use maps for uniqueness, not linear scan.** `(some #(= % uri) peers)` is
+   O(n); a `set` or a map key check with `contains?` is O(1).
+3. **Memoize in subscriptions, not in render.** Sorting contacts in a
+   `reg-sub` runs once per db change; sorting in the component body runs
+   on every re-render.
+4. **Prefer seqs for traversal, vectors for indexing.** `map`, `filter`,
+   `remove`, and `rseq` produce lazy seqs in O(1) — they wrap without
+   copying. `mapv`, `filterv`, `vec`, and `reverse` realize into new
+   collections. Use seqs when you only need to walk forward; use vectors
+   only when you need random access by index.
+
 ## Clojure(script) Style: Minimize Nesting
 
 Deeply nested async chains (`->` + `.then` + `fn` + `let` + `if`) cause
