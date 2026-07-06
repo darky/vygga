@@ -8,6 +8,7 @@
     "web-only": "npx expo start --web-only",
     "release": "npx shadow-cljs release app",
     "eject": "npx expo eject",
+    "test": "node --require ./test/support/preload.js out/test/test.js",
     "eas-build-post-install": "npx shadow-cljs release app"
   },
   "dependencies": {

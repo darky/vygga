@@ -29,15 +29,17 @@
   [private-key-hex message]
   (let [private-key (hex->bytes private-key-hex)
         message-bytes (.encode (js/TextEncoder.) message)
-        signature (.. nacl -sign -detached (call message-bytes private-key))]
+        sign-detached (.-detached (.-sign nacl))
+        signature (sign-detached message-bytes private-key)]
     (bytes->base64 signature)))
 
 (defn verify-signature
   [public-key-hex message signature-b64]
   (let [public-key (hex->bytes public-key-hex)
         message-bytes (.encode (js/TextEncoder.) message)
-        signature (base64->bytes signature-b64)]
-    (.. nacl -sign -detached -verify (call message-bytes signature public-key))))
+        signature (base64->bytes signature-b64)
+        verify (.-verify (.-detached (.-sign nacl)))]
+    (verify message-bytes signature public-key)))
 
 (defn generate-encryption-key
   []
@@ -48,7 +50,8 @@
   (let [key (base64->bytes key-b64)
         nonce (nacl.randomBytes nacl.secretbox.nonceLength)
         plain-bytes (.encode (js/TextEncoder.) plaintext)
-        ciphertext (.. nacl -secretbox (call plain-bytes nonce key))
+        secretbox (.-secretbox nacl)
+        ciphertext (secretbox plain-bytes nonce key)
         combined (js/Uint8Array. (+ (.-length nonce) (.-length ciphertext)))]
     (.set combined nonce 0)
     (.set combined ciphertext (.-length nonce))
@@ -60,6 +63,7 @@
         combined (base64->bytes combined-b64)
         nonce (.slice combined 0 nacl.secretbox.nonceLength)
         ciphertext (.slice combined nacl.secretbox.nonceLength)
-        plain-bytes (.. nacl -secretbox -open (call ciphertext nonce key))]
+        secretbox-open (.-open (.-secretbox nacl))
+        plain-bytes (secretbox-open ciphertext nonce key)]
     (when plain-bytes
       (.decode (js/TextDecoder.) plain-bytes))))

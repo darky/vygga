@@ -3,6 +3,7 @@
 /.expo/
 /app/
 /.cpcache/
+/out/
 *.DS_Store
 /.clj-kondo/.cache/
 /android/

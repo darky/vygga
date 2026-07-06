@@ -1,5 +1,55 @@
 # REPL-Driven Development
 
+## Unit Tests
+
+After each feature implementation or code change, run the test suite:
+
+```bash
+npx shadow-cljs compile test && node --require ./test/support/preload.js out/test/test.js
+```
+
+Or one command with `npm test`:
+
+```bash
+npm test
+```
+
+For TDD workflow, keep shadow-cljs watch running in a separate terminal:
+
+```bash
+# Terminal 1 (stays running)
+npx shadow-cljs watch test
+
+# Terminal 2 (re-run as needed)
+node --require ./test/support/preload.js out/test/test.js
+```
+
+### Test files structure
+
+Tests live in `test/vygga/` mirroring `src/main/vygga/`. Each source file has a corresponding `*_test.cljs` file. Test namespaces use the suffix `-test` (discovered automatically by shadow-cljs's `-test$` regex).
+
+### Test conventions
+
+You are a TDD developer. Every new feature or code change should be well covered with unit tests. Before submitting any change:
+
+1. Run `npm test` to verify all tests pass (existing + new)
+2. Run `clj-kondo --lint src/main test` to catch regressions
+
+Follow these conventions when writing tests:
+
+1. **Test data first** — set up db state or input data at the top of each `deftest`
+2. **Re-frame events** — use `re-frame.core/dispatch-sync` for synchronous testing; mock side-effect fx handlers via `re-frame.core/reg-fx`
+3. **Subscriptions** — test the handler function's data transformation directly; avoid `rf/subscribe` outside reactive context
+4. **JS interop** — native-only modules (`react-native`, `expo-*`, `@react-native-async-storage/async-storage`) are stubbed via `test/stubs/node_modules/`; the preload script at `test/support/preload.js` redirects `require()` for these modules at the Node.js level
+
+Run clj-kondo on both source and test directories:
+
+```bash
+clj-kondo --lint src/main test
+```
+
+Then run the test suite before submitting any changes.
+
 ## Code Quality
 
 After each finished task, run clj-kondo to lint Clojure(script) files:
