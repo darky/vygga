@@ -21,7 +21,7 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 
 ## Features
 
-- **P2P Messaging** — Send and receive messages directly between devices over the Yggdrasil mesh
+- **P2P Messaging** — Send and receive messages directly between devices over the Yggdrasil mesh (messages are ephemeral — cleared on app restart)
 - **Cryptographic Identity** — Ed25519 keypair generated on-device; messages are signed and verified via tweetnacl
 - **Contact Management** — Add contacts by Yggdrasil IPv6 address; unknown senders auto-create contacts
 - **Secure Storage** — Identity (private key) persisted via expo-secure-store (Android Keystore)

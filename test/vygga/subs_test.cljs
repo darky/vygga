@@ -1,6 +1,6 @@
 (ns vygga.subs-test
   (:require
-   [cljs.test :refer-macros [deftest is testing use-fixtures]]
+   [cljs.test :refer-macros [deftest is use-fixtures]]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
    [vygga.db :refer [app-db]]
@@ -42,18 +42,3 @@
 (deftest test-messenger-current-contact
   (reset! rdb/app-db (assoc-in app-db [:messenger :current-contact] "cid1"))
   (is (= "cid1" @(rf/subscribe [:messenger/current-contact]))))
-
-(deftest test-messenger-current-has-more
-  (testing "returns false for non-existent contact"
-    (is (= false @(rf/subscribe [:messenger/current-has-more]))))
-  (testing "returns has-more? for current contact"
-    (let [db (-> app-db
-                 (assoc-in [:messenger :current-contact] "c1")
-                 (assoc-in [:messenger :contacts "c1" :has-more?] true))]
-      (reset! rdb/app-db db)
-      (is (= true @(rf/subscribe [:messenger/current-has-more]))))))
-
-(deftest test-messenger-messages-loading
-  (is (= false @(rf/subscribe [:messenger/messages-loading])))
-  (reset! rdb/app-db (assoc-in app-db [:messenger :messages-loading] true))
-  (is (= true @(rf/subscribe [:messenger/messages-loading]))))

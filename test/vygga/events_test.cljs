@@ -5,7 +5,7 @@
    [re-frame.db :as rdb]
    [vygga.db :refer [app-db default-peers]]
    [vygga.crypto :as crypto]
-    [vygga.events]))
+   [vygga.events]))
 
 (def captured (atom {}))
 
@@ -28,14 +28,8 @@
 (rf/reg-fx :messenger/start-tcp-server (mock-fx :messenger/start-tcp-server))
 (rf/reg-fx :messenger/stop-tcp-server (mock-fx :messenger/stop-tcp-server))
 (rf/reg-fx :messenger/send-via-socks (mock-fx :messenger/send-via-socks))
-(rf/reg-fx :messenger/load-meta (mock-fx :messenger/load-meta))
-(rf/reg-fx :messenger/load-initial-page (mock-fx :messenger/load-initial-page))
-(rf/reg-fx :messenger/load-older-batch (mock-fx :messenger/load-older-batch))
-(rf/reg-fx :messenger/load-next-chunk (mock-fx :messenger/load-next-chunk))
-(rf/reg-fx :messenger/delete-contact-msgs (mock-fx :messenger/delete-contact-msgs))
-(rf/reg-fx :persist/messenger-meta (mock-fx :persist/messenger-meta))
-(rf/reg-fx :persist/messenger-write (mock-fx :persist/messenger-write))
-(rf/reg-fx :persist/messenger-update-msg (mock-fx :persist/messenger-update-msg))
+(rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
+(rf/reg-fx :messenger/save-contacts (mock-fx :messenger/save-contacts))
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
@@ -43,7 +37,7 @@
   (rf/dispatch-sync [:initialize-db])
   (is (= app-db @rdb/app-db))
   (is (contains? @captured :yggstack/load-and-start))
-  (is (contains? @captured :messenger/load-meta)))
+  (is (contains? @captured :messenger/load-contacts)))
 
 (deftest test-navigation-set-root-state
   (let [nav-state {:some :state}]
@@ -139,10 +133,8 @@
         (is (string? cid))
         (is (= "Alice" (:name c)))
         (is (= "201:abcd::1" (:address c)))
-        (is (= [] (:messages c)))
-        (is (= [] (:message-index c)))
-        (is (= 0 (:consumed-count c))))))
-  (is (contains? @captured :persist/messenger-meta)))
+        (is (= [] (:messages c))))))
+  (is (contains? @captured :messenger/save-contacts)))
 
 (deftest test-messenger-set-current-contact
   (let [cid "test-contact-1"]
@@ -168,9 +160,7 @@
       (is (true? (:from-me msg)))
       (is (= :sending (:status msg)))
       (is (string? (:id msg))))
-    (is (contains? @captured :messenger/send-via-socks))
-    (is (contains? @captured :persist/messenger-meta))
-    (is (contains? @captured :persist/messenger-write))))
+    (is (contains? @captured :messenger/send-via-socks))))
 
 (deftest test-messenger-message-sent
   (let [cid "test-contact"
@@ -182,8 +172,7 @@
     (reset! rdb/app-db db-with-sending)
     (rf/dispatch-sync [:messenger/message-sent cid msg-id])
     (let [msg (first (get-in @rdb/app-db [:messenger :contacts cid :messages]))]
-      (is (= :sent (:status msg))))
-    (is (contains? @captured :persist/messenger-update-msg))))
+      (is (= :sent (:status msg))))))
 
 (deftest test-messenger-message-failed
   (let [cid "test-contact"
@@ -197,45 +186,12 @@
     (let [msg (first (get-in @rdb/app-db [:messenger :contacts cid :messages]))]
       (is (= :failed (:status msg))))))
 
-(deftest test-messenger-set-contact-messages
-  (let [cid "test-contact"
-        msgs [{:id "m1" :text "hi"}]
-        index-entries [{:id "m1" :ts 100}]
-        consumed 1
-        total 2
-        pending ["_chunk2"]
-        has-more? true]
-    (rf/dispatch-sync [:messenger/set-contact-messages
-                       cid msgs index-entries consumed total pending has-more?])
-    (let [c (get-in @rdb/app-db [:messenger :contacts cid])]
-      (is (= (reverse msgs) (:messages c)))
-      (is (= index-entries (:message-index c)))
-      (is (= consumed (:consumed-count c)))
-      (is (= total (:total-count c)))
-      (is (= pending (:pending-chunks c)))
-      (is (= has-more? (:has-more? c)))
-      (is (= false (get-in @rdb/app-db [:messenger :messages-loading]))))))
-
-(deftest test-messenger-prepend-older-messages
-  (let [cid "test-contact"
-        existing [{:id "m2" :text "later"}]
-        older [{:id "m1" :text "earlier"}]
-        db-with-msg (assoc-in app-db [:messenger :contacts cid]
-                              {:messages existing})]
-    (reset! rdb/app-db db-with-msg)
-    (rf/dispatch-sync [:messenger/prepend-older-messages cid older 1 true])
-    (let [msgs (get-in @rdb/app-db [:messenger :contacts cid :messages])]
-      (is (= 2 (count msgs)))
-      (is (= 1 (get-in @rdb/app-db [:messenger :contacts cid :consumed-count])))
-      (is (= true (get-in @rdb/app-db [:messenger :contacts cid :has-more?]))))))
-
-(deftest test-messenger-restore-meta
-  (let [data {:contacts {"cid1" {:name "Alice" :address "201::1"}}}]
-    (rf/dispatch-sync [:messenger/restore-meta data])
+(deftest test-messenger-restore-contacts
+  (let [contacts {"cid1" {:name "Alice" :address "201::1"}}]
+    (rf/dispatch-sync [:messenger/restore-contacts contacts])
     (let [msngr (:messenger @rdb/app-db)]
       (is (contains? (:contacts msngr) "cid1"))
-      (is (= "Alice" (get-in (:contacts msngr) ["cid1" :name])))
-      (is (= [] (get-in (:contacts msngr) ["cid1" :messages]))))))
+      (is (= "Alice" (get-in (:contacts msngr) ["cid1" :name]))))))
 
 (deftest test-messenger-receive-incoming-unsigned
   (rf/dispatch-sync [:messenger/receive-incoming
@@ -264,7 +220,8 @@
         (is (= 1 (count contacts)))
         (is (some? contact))
         (is (= text (get-in contact [:messages 0 :text])))
-        (is (false? (get-in contact [:messages 0 :from-me])))))
+        (is (false? (get-in contact [:messages 0 :from-me]))))
+      (is (contains? @captured :messenger/save-contacts)))
     (testing "existing sender appends message"
       (let [address "201:bbbb::1"
             existing-cid "existing-contact"
@@ -278,9 +235,11 @@
                                           {:name "Bob" :address address
                                            :messages [{:text "prev"}]}))]
         (reset! rdb/app-db db-with-contact)
+        (reset! captured {})
         (rf/dispatch-sync [:messenger/receive-incoming
                            address msg2-text msg2-id msg2-ts pubkey sig2])
         (let [msgs (get-in @rdb/app-db [:messenger :contacts existing-cid :messages])]
           (is (= 2 (count msgs)))
           (is (= "Second msg" (:text (last msgs))))
-          (is (false? (:from-me (last msgs)))))))))
+          (is (false? (:from-me (last msgs)))))
+        (is (contains? @captured :messenger/save-contacts))))))

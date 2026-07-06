@@ -9,7 +9,6 @@ var stubModules = {
   'expo-secure-store': true,
   'expo-notifications': true,
   'react-native-battery-optimization-check': true,
-  '@react-native-async-storage/async-storage': true,
 };
 
 Module._resolveFilename = function(request, parent) {

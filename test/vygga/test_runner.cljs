@@ -4,7 +4,6 @@
    [vygga.crypto-test]
    [vygga.core-test]
    [vygga.yggstack-test]
-   [vygga.persist-test]
    [vygga.events-test]
    [vygga.subs-test]))
 
@@ -13,6 +12,5 @@
    'vygga.crypto-test
    'vygga.core-test
    'vygga.yggstack-test
-   'vygga.persist-test
    'vygga.events-test
    'vygga.subs-test))

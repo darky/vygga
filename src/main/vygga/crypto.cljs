@@ -41,29 +41,4 @@
         verify (.-verify (.-detached (.-sign nacl)))]
     (verify message-bytes signature public-key)))
 
-(defn generate-encryption-key
-  []
-  (bytes->base64 (nacl.randomBytes nacl.secretbox.keyLength)))
 
-(defn encrypt
-  [plaintext key-b64]
-  (let [key (base64->bytes key-b64)
-        nonce (nacl.randomBytes nacl.secretbox.nonceLength)
-        plain-bytes (.encode (js/TextEncoder.) plaintext)
-        secretbox (.-secretbox nacl)
-        ciphertext (secretbox plain-bytes nonce key)
-        combined (js/Uint8Array. (+ (.-length nonce) (.-length ciphertext)))]
-    (.set combined nonce 0)
-    (.set combined ciphertext (.-length nonce))
-    (bytes->base64 combined)))
-
-(defn decrypt
-  [combined-b64 key-b64]
-  (let [key (base64->bytes key-b64)
-        combined (base64->bytes combined-b64)
-        nonce (.slice combined 0 nacl.secretbox.nonceLength)
-        ciphertext (.slice combined nacl.secretbox.nonceLength)
-        secretbox-open (.-open (.-secretbox nacl))
-        plain-bytes (secretbox-open ciphertext nonce key)]
-    (when plain-bytes
-      (.decode (js/TextDecoder.) plain-bytes))))

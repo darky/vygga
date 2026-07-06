@@ -281,22 +281,14 @@
 (defn- chat []
   (r/with-let [current-id (rf/subscribe [:messenger/current-contact])
                contacts (rf/subscribe [:messenger/contacts])
-               has-more (rf/subscribe [:messenger/current-has-more])
-               messages-loading (rf/subscribe [:messenger/messages-loading])
                *text (r/atom "")
                *flat-ref (r/atom nil)
                *at-bottom (r/atom true)
-               *loaded-contact (r/atom nil)
                t (theme/use-theme)]
     (let [cid @current-id
           c (get @contacts cid)
           msgs (:messages c [])
-          has-more? @has-more
-          loading? @messages-loading
           insets (useSafeAreaInsets)]
-      (when (and cid (not= cid @*loaded-contact))
-        (reset! *loaded-contact cid)
-        (rf/dispatch [:messenger/load-contact-messages]))
       [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
        [:> rn/View {:style {:padding-horizontal 16 :padding-vertical 12
                             :border-bottom-width 1 :border-bottom-color (:border t)
@@ -307,7 +299,7 @@
        (if (empty? msgs)
          [:> rn/View {:style {:flex 1 :padding 40 :align-items :center}}
           [:> rn/Text {:style {:font-size 15 :color (:empty-text t)}}
-           (if loading? "Loading..." "No messages yet")]]
+           "No messages yet"]]
          [:> rn/FlatList
           {:data (clj->js (mapv msg->js (reverse msgs)))
            :key-extractor (fn [item] (.-id item))
@@ -321,19 +313,9 @@
            :on-scroll (fn [e]
                         (let [offset (.-y (.-contentOffset e))]
                           (reset! *at-bottom (< offset 50))))
-           :on-end-reached (fn []
-                             (when has-more?
-                               (rf/dispatch [:messenger/load-older-messages])))
-           :on-end-reached-threshold 0.3
            :initial-num-to-render 20
            :max-to-render-per-batch 20
            :window-size 7
-           :ListFooterComponent (when has-more?
-                                  (fn []
-                                    (r/as-element
-                                     [:> rn/View {:style {:padding 20 :align-items :center}}
-                                      [:> rn/Text {:style {:font-size 13 :color (:text-tertiary t)}}
-                                       (if loading? "Loading..." "Pull up to load more")]])))
            :render-item (fn [info]
                           (let [item (.-item info)
                                 id (.-id item)

@@ -6,8 +6,6 @@
  (fn [db _]
    (get-in db [:navigation :root-state])))
 
-;; ---- Yggdrasil subscriptions ----
-
 (rf/reg-sub
  :yggstack/status
  (fn [db _]
@@ -28,8 +26,6 @@
  (fn [db _]
    (get-in db [:yggstack :address])))
 
-;; ---- Messenger subscriptions ----
-
 (rf/reg-sub
  :messenger/contacts
  (fn [db _]
@@ -44,15 +40,3 @@
  :messenger/current-contact
  (fn [db _]
    (get-in db [:messenger :current-contact])))
-
-(rf/reg-sub
- :messenger/current-has-more
- :<- [:messenger/current-contact]
- :<- [:messenger/contacts]
- (fn [[cid contacts] _]
-   (get-in contacts [cid :has-more?] false)))
-
-(rf/reg-sub
- :messenger/messages-loading
- (fn [db _]
-   (get-in db [:messenger :messages-loading] false)))
