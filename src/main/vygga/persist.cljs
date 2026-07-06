@@ -1,5 +1,6 @@
 (ns vygga.persist
-  (:require ["expo-secure-store" :as secure-store]
+  (:require [cljs.reader :as reader]
+            ["expo-secure-store" :as secure-store]
             ["@react-native-async-storage/async-storage" :default async-storage]
             [vygga.crypto :as crypto]))
 
@@ -25,7 +26,7 @@
 (defn- encrypt-and-save! [storage-key data]
   (-> (get-or-create-encryption-key!)
       (.then (fn [key]
-               (let [plaintext (.stringify js/JSON (clj->js data))
+               (let [plaintext (pr-str data)
                      encrypted (crypto/encrypt plaintext key)]
                  (.setItem async-storage storage-key encrypted))))
       (.catch (fn [e]
@@ -39,7 +40,9 @@
                      (.then (fn [key]
                               (let [plaintext (crypto/decrypt encrypted key)]
                                 (when plaintext
-                                  (.. js/JSON (parse plaintext) (js->clj :keywordize-keys true))))))))))
+                                  (reader/read {:default (fn [tag _]
+                                                           (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
+                                               plaintext)))))))))
       (.catch (fn [e]
                 (js/console.warn "Failed to load" storage-key ":" e)
                 nil))))
@@ -82,16 +85,18 @@
   (if (empty? ids)
     (.resolve js/Promise [])
     (let [keys (mapv #(msg-key cid %) ids)]
-      (-> (.multiGet async-storage (clj->js keys))
+      (-> (.multiGet async-storage (apply array keys))
           (.then (fn [entries]
                    (-> (get-or-create-encryption-key!)
                        (.then (fn [key]
                                 (let [result (array)]
-                                  (doseq [[_ encrypted] (js->clj entries)]
+                                  (doseq [[_ encrypted] (mapv identity entries)]
                                     (when encrypted
                                       (let [plaintext (crypto/decrypt encrypted key)]
                                         (when plaintext
-                                          (.push result (.. js/JSON (parse plaintext) (js->clj :keywordize-keys true)))))))
+                                          (.push result (reader/read {:default (fn [tag _]
+                                                                                 (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
+                                                                     plaintext))))))
                                   (vec result)))))))))))
 
 ;; ---- Chunked index ----
@@ -159,10 +164,9 @@
   [contact-id]
   (-> (.getAllKeys async-storage)
       (.then (fn [keys]
-               (let [prefixes #{(str msg-key-prefix contact-id "_")
-                                (str idx-key-prefix contact-id "_")}
-                     matching (->> (js->clj keys)
-                                   (filter #(some (fn [p] (.startsWith % p)) prefixes))
-                                   (clj->js))]
-                 (when (pos? (.-length matching))
-                   (.multiRemove async-storage matching)))))))
+               (let [prefixes [(str msg-key-prefix contact-id "_")
+                               (str idx-key-prefix contact-id "_")]
+                     matching (filter (fn [k] (some #(.startsWith k %) prefixes))
+                                      (mapv identity keys))]
+                 (when (seq matching)
+                   (.multiRemove async-storage (apply array matching))))))))

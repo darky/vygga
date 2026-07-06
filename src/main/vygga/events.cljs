@@ -479,14 +479,13 @@
  (fn [{:keys [address my-address private-key public-key contact-id text msg-id ts]}]
    (let [data-to-sign (str text "|" msg-id "|" ts)
          sig (crypto/sign-message private-key data-to-sign)
-         msg (js/JSON.stringify (clj->js
-                                 {:type "message"
-                                  :from (or my-address "unknown")
-                                  :text text
-                                  :id msg-id
-                                  :ts ts
-                                  :pubkey public-key
-                                  :sig sig}))]
+         msg (pr-str {:type "message"
+                      :from (or my-address "unknown")
+                      :text text
+                      :id msg-id
+                      :ts ts
+                      :pubkey public-key
+                      :sig sig})]
      (-> (msg/send-message address msg)
          (.then (fn [_]
                   (rf/dispatch [:messenger/message-sent contact-id msg-id])))

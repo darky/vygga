@@ -1,5 +1,6 @@
 (ns vygga.messenger
-  (:require [re-frame.core :as rf]
+  (:require [cljs.reader :as reader]
+            [re-frame.core :as rf]
             ["react-native" :as rn]))
 
 (defonce native-module
@@ -56,16 +57,12 @@
       (when NativeEventEmitter
         (let [emitter (NativeEventEmitter. native-module)
               sub (.addListener emitter "onMessengerMessage"
-                                (fn [json-str]
+                                (fn [payload]
                                   (try
-                                    (let [msg (js/JSON.parse json-str)
-                                          type (.-type msg)
-                                          from (.-from msg)
-                                          text (.-text msg)
-                                          id (.-id msg)
-                                          ts (.-ts msg)
-                                          pubkey (.-pubkey msg)
-                                          sig (.-sig msg)]
+                                    (let [{:keys [type from text id ts pubkey sig]}
+                                          (reader/read {:default (fn [tag _]
+                                                                   (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
+                                                       payload)]
                                       (when (and (= type "message") from)
                                         (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
                                     (catch js/Error e
