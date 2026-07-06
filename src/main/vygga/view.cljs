@@ -244,14 +244,6 @@
 
 ;; ---- Chat Screen ----
 
-(defn- msg->js
-  [m]
-  #js {:id (:id m)
-       :text (:text m)
-       :fromMe (:from-me m)
-       :status (when (:status m) (name (:status m)))
-       :ts (:ts m)})
-
 (defn- message-bubble [{:keys [id text from-me status cid]}]
   (r/with-let [t (theme/use-theme)]
     [:> rn/View {:style {:align-items (if from-me :flex-end :flex-start)
@@ -301,7 +293,7 @@
           [:> rn/Text {:style {:font-size 15 :color (:empty-text t)}}
            "No messages yet"]]
          [:> rn/FlatList
-          {:data (clj->js (mapv msg->js (reverse msgs)))
+          {:data (clj->js (reverse msgs))
            :key-extractor (fn [item] (.-id item))
            :inverted true
            :ref #(reset! *flat-ref %)
@@ -320,7 +312,7 @@
                           (let [item (.-item info)
                                 id (.-id item)
                                 text (.-text item)
-                                from-me (.-fromMe item)
+                                from-me (.-from-me item)
                                 status (when (.-status item) (keyword (.-status item)))]
                             (r/as-element
                              [message-bubble

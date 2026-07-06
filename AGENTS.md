@@ -5,13 +5,15 @@
 After each feature implementation or code change, run the test suite:
 
 ```bash
-npx shadow-cljs compile test && node --require ./test/support/preload.js out/test/test.js
+npm test
 ```
 
-Or one command with `npm test`:
+This compiles ClojureScript via shadow-cljs then runs the tests under Node.js.
+
+For a quicker re-run (skip the compile step), use:
 
 ```bash
-npm test
+npm run test:quick
 ```
 
 For TDD workflow, keep shadow-cljs watch running in a separate terminal:
@@ -21,7 +23,7 @@ For TDD workflow, keep shadow-cljs watch running in a separate terminal:
 npx shadow-cljs watch test
 
 # Terminal 2 (re-run as needed)
-node --require ./test/support/preload.js out/test/test.js
+npm run test:quick
 ```
 
 ### Test files structure
