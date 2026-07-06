@@ -298,32 +298,31 @@
           [:> rn/Text {:style {:font-size 15 :color (:empty-text t)}}
            "No messages yet"]]
          [:> rn/FlatList
-          {:data (clj->js (reverse msgs))
-           :key-extractor (fn [item] (.-id item))
-           :inverted true
-           :ref #(reset! *flat-ref %)
-           :style {:flex 1 :padding 12}
-           :on-content-size-change (fn []
-                                     (when (and @*at-bottom @*flat-ref)
-                                       (try (.scrollToEnd @*flat-ref #js {:animated false})
-                                            (catch js/Error _))))
-           :on-scroll (fn [e]
-                        (let [offset (.-y (.-contentOffset e))]
-                          (reset! *at-bottom (< offset 50))))
-           :initial-num-to-render 20
-           :max-to-render-per-batch 20
-           :window-size 7
-           :render-item (fn [info]
-                          (let [item (.-item info)
-                                id (.-id item)
-                                text (.-text item)
-                                from-me (.-from-me item)
-                                status (when (.-status item) (keyword (.-status item)))]
-                            (r/as-element
-                             [message-bubble
-                              {:id id :text text :from-me from-me
-                               :status status :cid cid
-                               :on-resend #(rf/dispatch [:messenger/resend-message cid id])}])))}])
+           {:data (to-array (reverse msgs))
+            :key-extractor (fn [item] (.-id item))
+            :inverted true
+            :ref #(reset! *flat-ref %)
+            :style {:flex 1 :padding 12}
+            :on-content-size-change (fn []
+                                      (when (and @*at-bottom @*flat-ref)
+                                        (try (.scrollToEnd @*flat-ref #js {:animated false})
+                                             (catch js/Error _))))
+            :on-scroll (fn [e]
+                         (let [offset (.-y (.-contentOffset e))]
+                           (reset! *at-bottom (< offset 50))))
+            :initial-num-to-render 20
+            :max-to-render-per-batch 20
+            :window-size 7
+            :render-item (fn [info]
+                           (let [item (.-item info)
+                                 id (:id item)
+                                 text (:text item)
+                                 from-me (:from-me item)
+                                 status (:status item)]
+                             (r/as-element
+                              [message-bubble
+                               {:id id :text text :from-me from-me
+                                :status status :cid cid}])))}])
        [:> rn/View {:style {:flex-direction :row :align-items :center
                             :padding 12 :border-top-width 1
                             :border-top-color (:border t)
