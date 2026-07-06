@@ -5,7 +5,8 @@
    [vygga.core-test]
    [vygga.yggstack-test]
    [vygga.events-test]
-   [vygga.subs-test]))
+   [vygga.subs-test]
+   [vygga.view-test]))
 
 (defn -main [& _]
   (run-tests
@@ -13,4 +14,5 @@
    'vygga.core-test
    'vygga.yggstack-test
    'vygga.events-test
-   'vygga.subs-test))
+   'vygga.subs-test
+   'vygga.view-test))

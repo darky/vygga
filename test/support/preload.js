@@ -9,6 +9,11 @@ var stubModules = {
   'expo-secure-store': true,
   'expo-notifications': true,
   'react-native-battery-optimization-check': true,
+  'expo-status-bar': true,
+  '@react-navigation/native': true,
+  '@react-navigation/native-stack': true,
+  'react-native-safe-area-context': true,
+  '@expo/vector-icons/Ionicons': true,
 };
 
 Module._resolveFilename = function(request, parent) {

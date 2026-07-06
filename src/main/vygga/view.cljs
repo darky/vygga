@@ -14,17 +14,20 @@
 
 (defonce Stack (rnn-stack/createNativeStackNavigator))
 
+(defn status-label [status t]
+  (case status
+    :running [(:success t) "Connected"]
+    :starting [(:warning t) "Connecting..."]
+    :stopping [(:warning t) "Disconnecting..."]
+    [(:error t) "Disconnected"]))
+
 (defn status-indicator [^js props]
   (r/with-let [status (rf/subscribe [:yggstack/status])
                peer-count (rf/subscribe [:yggstack/peer-count])
                address (rf/subscribe [:yggstack/address])
                t (theme/use-theme)]
     (let [s @status
-          [color label] (case s
-                          :running [(:success t) "Connected"]
-                          :starting [(:warning t) "Connecting..."]
-                          :stopping [(:warning t) "Disconnecting..."]
-                          [(:error t) "Disconnected"])
+          [color label] (status-label s t)
           peers @peer-count
           addr @address]
       [:> rn/View {:style {:flex-direction :row
@@ -49,7 +52,7 @@
         (when (and addr (not= addr ""))
           [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t) :margin-left 8}} (subs addr 0 15)])]])))
 
-(defn- settings []
+(defn settings []
   (r/with-let [status (rf/subscribe [:yggstack/status])
                peers (rf/subscribe [:yggstack/peers])
                address (rf/subscribe [:yggstack/address])
@@ -62,11 +65,7 @@
        [:> rn/Text {:style {:font-size 18 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
         "Yggdrasil Network"]
        (let [s @status
-             [color label] (case s
-                             :running [(:success t) "Connected"]
-                             :starting [(:warning t) "Connecting..."]
-                             :stopping [(:warning t) "Disconnecting..."]
-                             [(:error t) "Disconnected"])]
+             [color label] (status-label s t)]
          [:> rn/View {:style {:flex-direction :row :align-items :center :margin-bottom 8}}
           [:> rn/View {:style {:width 14 :height 14 :border-radius 7
                                :background-color color :margin-right 8}}]
@@ -135,30 +134,33 @@
 
 ;; ---- Contact List Screen ----
 
-(defn- contact-item [^js props contact-id {:keys [name address last-message]}]
-  (r/with-let [t (theme/use-theme)]
-    (let [preview (when last-message (:text last-message) "")]
-      [:> rn/TouchableOpacity
-       {:key contact-id
-        :style {:flex-direction :row :align-items :center
-                :padding 14 :border-bottom-width 1
-                :border-bottom-color (:border-light t)}
-        :on-press #(do
-                     (rf/dispatch [:messenger/set-current-contact contact-id])
-                     (-> props .-navigation (.navigate "Chat")))}
-       [:> rn/View {:style {:width 44 :height 44 :border-radius 22
-                            :background-color (:accent t) :justify-content :center
-                            :align-items :center :margin-right 12}}
-        [:> rn/Text {:style {:color (:text-inverse t) :font-size 18 :font-weight :bold}}
-         (-> name .charAt (.toUpperCase))]]
-       [:> rn/View {:style {:flex 1}}
-        [:> rn/Text {:style {:font-size 16 :font-weight :600 :color (:text-primary t)}} name]
-        (when (seq preview)
-          [:> rn/Text {:style {:font-size 13 :color (:text-tertiary t) :margin-top 2}
-                       :number-of-lines 1} preview])]
-       [:> rn/Text {:style {:font-size 11 :color (:text-muted t)}} address]])))
+(defn contact-item-render [^js props contact-id {:keys [name address last-message]} t]
+  (let [preview (if last-message (:text last-message) "")]
+    [:> rn/TouchableOpacity
+     {:key contact-id
+      :style {:flex-direction :row :align-items :center
+              :padding 14 :border-bottom-width 1
+              :border-bottom-color (:border-light t)}
+      :on-press #(do
+                   (rf/dispatch [:messenger/set-current-contact contact-id])
+                   (-> props .-navigation (.navigate "Chat")))}
+     [:> rn/View {:style {:width 44 :height 44 :border-radius 22
+                          :background-color (:accent t) :justify-content :center
+                          :align-items :center :margin-right 12}}
+      [:> rn/Text {:style {:color (:text-inverse t) :font-size 18 :font-weight :bold}}
+       (-> name .charAt (.toUpperCase))]]
+     [:> rn/View {:style {:flex 1}}
+      [:> rn/Text {:style {:font-size 16 :font-weight :600 :color (:text-primary t)}} name]
+      (when (seq preview)
+        [:> rn/Text {:style {:font-size 13 :color (:text-tertiary t) :margin-top 2}
+                     :number-of-lines 1} preview])]
+     [:> rn/Text {:style {:font-size 11 :color (:text-muted t)}} address]]))
 
-(defn- contacts [props]
+(defn contact-item [^js props contact-id {:keys [name address last-message]}]
+  (r/with-let [t (theme/use-theme)]
+    (contact-item-render props contact-id {:name name :address address :last-message last-message} t)))
+
+(defn contacts [props]
   (r/with-let [contacts-map (rf/subscribe [:messenger/contacts])
                server-running (rf/subscribe [:messenger/server-running])
                *show-add (r/atom false)
@@ -244,33 +246,36 @@
 
 ;; ---- Chat Screen ----
 
-(defn- message-bubble [{:keys [id text from-me status cid]}]
-  (r/with-let [t (theme/use-theme)]
-    [:> rn/View {:style {:align-items (if from-me :flex-end :flex-start)
-                         :margin-bottom 8}}
-     [:> rn/View {:style {:max-width "75%"
-                          :background-color (if from-me (:bg-bubble-sent t) (:bg-bubble-received t))
-                          :border-radius 16 :padding 12}}
-      [:> rn/Text {:style {:font-size 15
-                           :color (if from-me (:text-bubble-sent t) (:text-bubble-received t))}}
-       text]
-      (when (and from-me (= status :sent))
-        [:> rn/Text {:style {:font-size 12 :color (:checkmark t)
-                             :text-align :right :margin-top 4}}
-         "✓"])]
-     (when (and from-me (= status :failed))
-       [:> rn/View {:style {:flex-direction :row :align-items :center
-                            :margin-top 4}}
-        [:> rn/Text {:style {:font-size 12 :color (:error t) :margin-right 8}}
-         "! Failed"]
-        [:> rn/TouchableOpacity {:on-press #(rf/dispatch [:messenger/resend-message cid id])
-                                 :style {:padding-horizontal 10 :padding-vertical 4
-                                         :border-radius 8 :border-width 1
-                                         :border-color (:error t)}}
-         [:> rn/Text {:style {:font-size 12 :color (:error t) :font-weight :600}}
-          "Resend"]]])]))
+(defn message-bubble-render [{:keys [id text from-me status cid]} t]
+  [:> rn/View {:style {:align-items (if from-me :flex-end :flex-start)
+                       :margin-bottom 8}}
+   [:> rn/View {:style {:max-width "75%"
+                        :background-color (if from-me (:bg-bubble-sent t) (:bg-bubble-received t))
+                        :border-radius 16 :padding 12}}
+    [:> rn/Text {:style {:font-size 15
+                         :color (if from-me (:text-bubble-sent t) (:text-bubble-received t))}}
+     text]
+    (when (and from-me (= status :sent))
+      [:> rn/Text {:style {:font-size 12 :color (:checkmark t)
+                           :text-align :right :margin-top 4}}
+       "✓"])]
+   (when (and from-me (= status :failed))
+     [:> rn/View {:style {:flex-direction :row :align-items :center
+                          :margin-top 4}}
+      [:> rn/Text {:style {:font-size 12 :color (:error t) :margin-right 8}}
+       "! Failed"]
+      [:> rn/TouchableOpacity {:on-press #(rf/dispatch [:messenger/resend-message cid id])
+                               :style {:padding-horizontal 10 :padding-vertical 4
+                                       :border-radius 8 :border-width 1
+                                       :border-color (:error t)}}
+       [:> rn/Text {:style {:font-size 12 :color (:error t) :font-weight :600}}
+        "Resend"]]])])
 
-(defn- chat []
+(defn message-bubble [{:keys [id text from-me status cid]}]
+  (r/with-let [t (theme/use-theme)]
+    (message-bubble-render {:id id :text text :from-me from-me :status status :cid cid} t)))
+
+(defn chat []
   (r/with-let [current-id (rf/subscribe [:messenger/current-contact])
                contacts (rf/subscribe [:messenger/contacts])
                *text (r/atom "")
