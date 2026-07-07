@@ -105,6 +105,7 @@ function withYggstackPermissions(config) {
       'android.permission.INTERNET',
       'android.permission.ACCESS_NETWORK_STATE',
       'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
       'android.permission.POST_NOTIFICATIONS',
     ];
     const existing = perms.map((p) => p.$['android:name']);
@@ -114,6 +115,32 @@ function withYggstackPermissions(config) {
       }
     }
     manifest.manifest['uses-permission'] = perms;
+
+    // Add YggdrasilService as a foreground service
+    const app = manifest.manifest.application || [];
+    if (!Array.isArray(app)) {
+      manifest.manifest.application = [app];
+    }
+    const appElem = manifest.manifest.application[0];
+    if (appElem) {
+      const services = appElem['service'] || [];
+      const fullServiceName = `${YGGSTACK_PACKAGE}.YggdrasilService`;
+      const hasService = services.some(
+        (s) => s.$['android:name'] === fullServiceName
+      );
+      if (!hasService) {
+        services.push({
+          $: {
+            'android:name': fullServiceName,
+            'android:foregroundServiceType': 'dataSync',
+            'android:exported': 'false',
+            'android:stopWithTask': 'false',
+          },
+        });
+        appElem['service'] = services;
+      }
+    }
+
     return cfg;
   });
 }
@@ -133,6 +160,11 @@ function withYggstackModuleSources(config) {
       const moduleFile = path.join(srcDir, 'YggstackModule.java');
       fs.writeFileSync(moduleFile, moduleCode, 'utf8');
       console.log('[withYggstack] Created YggstackModule.java');
+
+      const serviceCode = fs.readFileSync(path.join(YGGSTACK_JAVA_SRC, 'YggdrasilService.java'), 'utf8');
+      const serviceFile = path.join(srcDir, 'YggdrasilService.java');
+      fs.writeFileSync(serviceFile, serviceCode, 'utf8');
+      console.log('[withYggstack] Created YggdrasilService.java');
 
       const packageCode = fs.readFileSync(path.join(YGGSTACK_JAVA_SRC, 'YggstackPackage.java'), 'utf8');
       const packageFile = path.join(srcDir, 'YggstackPackage.java');

@@ -51,25 +51,42 @@
 
 (defonce listener-sub (atom nil))
 
+(declare poll-pending-messages!)
+
+(defn- parse-and-dispatch [payload]
+  (try
+    (let [{:keys [type from text id ts pubkey sig]}
+          (reader/read-string {:default (fn [tag _]
+                                          (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
+                              payload)]
+      (when (and (= type "message") from)
+        (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
+    (catch js/Error e
+      (js/console.warn "Failed to parse messenger message:" e))))
+
 (defn install-message-listener! []
-  (when (and native-module (nil? @listener-sub))
+  (when native-module
+    (when-let [remove @listener-sub]
+      (remove)
+      (reset! listener-sub nil))
     (let [NativeEventEmitter (.-NativeEventEmitter rn)]
       (when NativeEventEmitter
         (let [emitter (NativeEventEmitter. native-module)
-              sub (.addListener emitter "onMessengerMessage"
-                                (fn [payload]
-                                  (try
-                                    (let [{:keys [type from text id ts pubkey sig]}
-                                          (reader/read-string {:default (fn [tag _]
-                                                                          (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
-                                                              payload)]
-                                      (when (and (= type "message") from)
-                                        (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
-                                    (catch js/Error e
-                                      (js/console.warn "Failed to parse messenger message:" e)))))]
-          (reset! listener-sub #(.remove sub)))))))
+              sub (.addListener emitter "onMessengerMessage" parse-and-dispatch)]
+          (reset! listener-sub #(.remove sub))
+          (poll-pending-messages!))))))
 
 (defn uninstall-message-listener! []
   (when-let [remove @listener-sub]
     (remove)
     (reset! listener-sub nil)))
+
+(defn poll-pending-messages! []
+  (when (has-method "pollPendingMessages")
+    (-> (.pollPendingMessages native-module)
+        (.then (fn [msgs]
+                 (when (and msgs (.-length msgs) (pos? (.-length msgs)))
+                   (doseq [msg (js->clj msgs)]
+                     (parse-and-dispatch msg)))))
+        (.catch (fn [e]
+                  (js/console.warn "pollPendingMessages error:" e))))))

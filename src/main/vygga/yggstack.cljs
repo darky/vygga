@@ -1,6 +1,5 @@
 (ns vygga.yggstack
   (:require [clojure.string :as str]
-            ["expo-notifications" :as Notifications]
             ["react-native-battery-optimization-check" :refer [RequestDisableOptimization]]
             ["react-native" :as rn]))
 
@@ -60,38 +59,16 @@
          "}")))
 
 ;; ---- Foreground Service ----
+;; Now backed by a real Android foreground service (YggdrasilService.java).
+;; The native module's start() and stop() manage the service lifecycle automatically.
 
-(defonce fg-service-channel-created (atom false))
-
-(defn ensure-fg-channel! []
-  (when-not @fg-service-channel-created
-    (reset! fg-service-channel-created true)
-    (Notifications/setNotificationChannelAsync "yggdrasil_channel"
-                                               #js {:name "Yggdrasil Messenger"
-                                                    :description "Keeps the app alive for message receiving"
-                                                    :importance (.-LOW (.-AndroidImportance Notifications))
-                                                    :enableVibration false})))
-
-(defn start-foreground-service [title text]
-  (ensure-fg-channel!)
+(defn start-foreground-service [_title _text]
   (when native-module
-    (.setForegroundServiceActive native-module true))
-  (-> (Notifications/scheduleNotificationAsync
-       #js {:identifier "yggdrasil-fg"
-            :content #js {:channelId "yggdrasil_channel"
-                          :title title
-                          :body text
-                          :sticky true
-                          :priority "low"
-                          :autoDismiss false}
-            :trigger nil})
-      (.catch (fn [e] (js/console.warn "FG notification error:" e)))))
+    (js/console.log "Foreground service active (native)")))
 
 (defn stop-foreground-service []
   (when native-module
-    (.setForegroundServiceActive native-module false))
-  (-> (Notifications/dismissNotificationAsync "yggdrasil-fg")
-      (.catch (fn [e] (js/console.warn "FG notification stop error:" e)))))
+    (js/console.log "Foreground service stopped (native)")))
 
 ;; ---- Battery Optimization ----
 

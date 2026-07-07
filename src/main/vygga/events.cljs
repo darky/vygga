@@ -14,6 +14,9 @@
 (rf/reg-event-fx
  :initialize-db
  (fn [_ _]
+   ;; Install listener early — native onHostResume may have already
+   ;; registered the Java-side listener, so JS needs to catch up
+   (msg/install-message-listener!)
    {:db app-db
     :yggstack/load-and-start nil
     :messenger/load-contacts nil}))
@@ -258,6 +261,9 @@
 (rf/reg-event-fx
  :messenger/start-server
  (fn [{db :db} _]
+   ;; Install listener immediately, before server promise resolves,
+   ;; so no onMessengerMessage events are missed on re-launch
+   (msg/install-message-listener!)
    (let [port (get-in db [:messenger :server-port] 7777)]
      {:messenger/start-tcp-server {:port port}
       :db (assoc-in db [:messenger :server-running] true)})))
@@ -273,11 +279,9 @@
  (fn [{:keys [port]}]
    (let [p (or port 7777)]
      (-> (msg/start-server! p)
-         (.then (fn []
-                  (msg/add-remote-mapping p)
-                  (msg/install-message-listener!)))
+         (.then #(msg/add-remote-mapping p))
          (.catch (fn [e]
-                   (js/console.error "Failed to start messenger server:" e)))))))
+                   (js/console.warn "Messenger server already running:" e)))))))
 
 (rf/reg-fx
  :messenger/stop-tcp-server
