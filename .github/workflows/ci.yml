@@ -22,9 +22,17 @@ jobs:
           node-version: 26
           cache: npm
 
-      - uses: babashka/bb-install@v1
+      - name: Install Babashka
+        run: |
+          curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
+          chmod +x install
+          sudo ./install
 
-      - uses: clj-kondo/install-clj-kondo@v1
+      - name: Install clj-kondo
+        run: |
+          curl -sLO https://raw.githubusercontent.com/clj-kondo/clj-kondo/master/script/install-clj-kondo
+          chmod +x install-clj-kondo
+          sudo ./install-clj-kondo
 
       - name: Cache Maven dependencies
         uses: actions/cache@v4
