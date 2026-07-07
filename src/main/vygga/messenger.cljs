@@ -60,9 +60,9 @@
                                 (fn [payload]
                                   (try
                                     (let [{:keys [type from text id ts pubkey sig]}
-                                          (reader/read {:default (fn [tag _]
-                                                                   (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
-                                                       payload)]
+                                          (reader/read-string {:default (fn [tag _]
+                                                                          (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
+                                                              payload)]
                                       (when (and (= type "message") from)
                                         (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
                                     (catch js/Error e

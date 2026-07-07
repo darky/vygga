@@ -284,7 +284,7 @@
            "No messages yet"]]
          [:> rn/FlatList
           {:data (to-array (rseq msgs))
-           :key-extractor (fn [item] (.-id item))
+           :key-extractor (fn [item] (:id item))
            :inverted true
            :ref #(reset! *flat-ref %)
            :style {:flex 1 :padding 12}
