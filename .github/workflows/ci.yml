@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - uses: babashka/bb-install@v1
+
+      - uses: clj-kondo/install-clj-kondo@v1
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('deps.edn') }}
+
+      - name: Cache shadow-cljs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.shadow-cljs
+            .shadow-cljs
+          key: ${{ runner.os }}-shadow-${{ hashFiles('deps.edn', 'shadow-cljs.edn') }}
+
+      - run: npm ci
+
+      - name: Compile + Test
+        run: npm test
+
+      - name: Lint
+        run: clj-kondo --lint src/main test
+
+      - name: Format check
+        run: bb check-format
+
+      - name: Unused vars
+        run: bb check-unused-vars
