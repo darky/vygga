@@ -77,11 +77,11 @@
        [:> rn/Text {:style {:font-size 13 :color (:text-secondary t) :margin-bottom 4}}
         (str "Connected Peers: " @peer-count)]
        (when-let [addr @address]
-          [:> rn/TouchableOpacity {:on-press #(-> Clipboard (.setStringAsync addr))
-                                   :style {:flex-direction :row :align-items :center}}
-           [:> rn/Text {:style {:font-size 12 :color (:text-tertiary t) :flex-shrink 1}}
-            (str "IPv6: " addr)]
-           [:> Ionicons {:name "copy-outline" :size 14 :color (:text-tertiary t) :margin-left 6}]])]
+         [:> rn/TouchableOpacity {:on-press #(-> Clipboard (.setStringAsync addr))
+                                  :style {:flex-direction :row :align-items :center}}
+          [:> rn/Text {:style {:font-size 12 :color (:text-tertiary t) :flex-shrink 1}}
+           (str "IPv6: " addr)]
+          [:> Ionicons {:name "copy-outline" :size 14 :color (:text-tertiary t) :margin-left 6}]])]
 
       (let [s @status]
         (if (= s :running)
@@ -169,33 +169,12 @@
 
 (defn contacts [props]
   (r/with-let [sorted-contacts (rf/subscribe [:messenger/sorted-contacts])
-               server-running (rf/subscribe [:messenger/server-running])
                *show-add (r/atom false)
                *new-name (r/atom "")
                *new-addr (r/atom "")
                t (theme/use-theme)]
     [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
      [status-indicator props]
-     [:> rn/View {:style {:flex-direction :row :align-items :center
-                          :justify-content :space-between
-                          :padding-horizontal 16 :padding-vertical 10
-                          :background-color (str (if @server-running (:success t) (:error t)) "10")
-                          :border-bottom-width 1 :border-bottom-color (:border t)}}
-      [:> rn/View {:style {:flex-direction :row :align-items :center}}
-       [:> rn/View {:style {:width 10 :height 10 :border-radius 5
-                            :background-color (if @server-running (:success t) (:error t))
-                            :margin-right 8}}]
-       [:> rn/Text {:style {:font-size 14 :font-weight :500
-                            :color (if @server-running (:success t) (:error t))}}
-        (if @server-running "Messenger Online" "Messenger Offline")]]
-      [:> rn/Pressable {:on-press #(if @server-running
-                                     (rf/dispatch [:messenger/stop-server])
-                                     (rf/dispatch [:messenger/start-server]))
-                        :style {:padding-horizontal 12 :padding-vertical 4
-                                :border-radius 12 :border-width 1
-                                :border-color (if @server-running (:error t) (:success t))}}
-       [:> rn/Text {:style {:font-size 12 :color (if @server-running (:error t) (:success t))}}
-        (if @server-running "Stop" "Start")]]]
      [:> rn/ScrollView {:style {:flex 1 :padding-bottom 90}}
       (let [sorted @sorted-contacts]
         (if (empty? sorted)
