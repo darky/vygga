@@ -330,8 +330,7 @@
      (-> (msg/send-message address msg)
          (.then (fn [_]
                   (rf/dispatch [:messenger/message-sent contact-id msg-id])))
-         (.catch (fn [e]
-                   (js/console.error "send error:" e)
+         (.catch (fn [_]
                    (rf/dispatch [:messenger/message-failed contact-id msg-id])))))))
 
 (rf/reg-event-db

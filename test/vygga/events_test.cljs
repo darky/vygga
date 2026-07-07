@@ -191,6 +191,30 @@
     (let [msg (first (get-in @rdb/app-db [:messenger :contacts cid :messages]))]
       (is (= :failed (:status msg))))))
 
+(deftest test-messenger-resend-message
+  (let [cid "test-contact"
+        msg-id "msg-3"
+        address "201:abcd::2"
+        db-with-failed (-> app-db
+                           (assoc-in [:messenger :contacts cid]
+                                     {:name "Test" :address address
+                                      :messages [{:id msg-id :text "hi"
+                                                  :from-me true :status :failed}]
+                                      :msg-index {msg-id 0}})
+                           (assoc-in [:yggstack :address] "201:abcd::1")
+                           (assoc-in [:yggstack :private-key] "privkey")
+                           (assoc-in [:yggstack :public-key] "pubkey"))]
+    (reset! rdb/app-db db-with-failed)
+    (rf/dispatch-sync [:messenger/resend-message cid msg-id])
+    (let [msg (first (get-in @rdb/app-db [:messenger :contacts cid :messages]))]
+      (is (= :sending (:status msg))))
+    (is (contains? @captured :messenger/send-via-socks))
+    (let [opts (get @captured :messenger/send-via-socks)]
+      (is (= address (:address opts)))
+      (is (= cid (:contact-id opts)))
+      (is (= "hi" (:text opts)))
+      (is (= msg-id (:msg-id opts))))))
+
 (deftest test-messenger-restore-contacts
   (let [contacts {"cid1" {:name "Alice" :address "201::1"}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
