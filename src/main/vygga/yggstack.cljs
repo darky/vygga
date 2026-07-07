@@ -8,22 +8,32 @@
   (try (-> (js/require "react-native") .-NativeModules .-YggstackModule)
        (catch js/Error _ nil)))
 
+(defn- check-module []
+  (when-not native-module
+    (throw (js/Error. "YggstackModule native module is not registered. Ensure YggstackPackage is added to MainApplication.kt and the app was rebuilt."))))
+
 (defn generate-config []
+  (check-module)
   (.generateConfig native-module))
 
 (defn start [config-json socks-addr nameserver]
+  (check-module)
   (.start native-module config-json socks-addr nameserver))
 
 (defn stop []
+  (check-module)
   (.stop native-module))
 
 (defn get-peers []
+  (check-module)
   (.getPeersJSON native-module))
 
 (defn get-address []
+  (check-module)
   (.getAddress native-module))
 
 (defn get-public-key []
+  (check-module)
   (.getPublicKey native-module))
 
 (defn extract-private-key [config-json]

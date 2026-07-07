@@ -44,23 +44,38 @@ function withYggstackAppBuildGradle(config) {
   });
 }
 
+function findMainApplicationKt(javaDir) {
+  if (!fs.existsSync(javaDir)) return null;
+  const entries = fs.readdirSync(javaDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(javaDir, entry.name);
+    if (entry.isDirectory()) {
+      const found = findMainApplicationKt(fullPath);
+      if (found) return found;
+    } else if (entry.name === 'MainApplication.kt') {
+      return fullPath;
+    }
+  }
+  return null;
+}
+
 function withYggstackMainApplicationKt(config) {
   return withDangerousMod(config, [
     'android',
     (cfg) => {
-      const mainAppPath = path.join(
+      const javaDir = path.join(
         cfg.modRequest.platformProjectRoot,
-        'app', 'src', 'main', 'java',
-        'com', 'anonymous', 'reagentexpo', 'MainApplication.kt'
+        'app', 'src', 'main', 'java'
       );
-      if (!fs.existsSync(mainAppPath)) {
-        console.warn('[withYggstack] WARNING: MainApplication.kt not found at', mainAppPath);
+      const mainAppPath = findMainApplicationKt(javaDir);
+      if (!mainAppPath) {
+        console.warn('[withYggstack] WARNING: MainApplication.kt not found under', javaDir);
         return cfg;
       }
       let code = fs.readFileSync(mainAppPath, 'utf8');
 
       const importLine = `import ${YGGSTACK_PACKAGE}.YggstackPackage`;
-      const addLine = '            add(YggstackPackage())';
+      const addLine = '          add(YggstackPackage())';
 
       if (!code.includes(importLine)) {
         code = code.replace(
@@ -70,8 +85,8 @@ function withYggstackMainApplicationKt(config) {
       }
       if (!code.includes(addLine)) {
         code = code.replace(
-          /(\/\/ add\(MyReactNativePackage\(\)\))/,
-          `${addLine}\n          $1`
+          /(PackageList\(this\)\.packages\.apply \{)/,
+          `$1\n${addLine}`
         );
       }
 

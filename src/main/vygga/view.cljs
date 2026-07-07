@@ -9,7 +9,7 @@
             [reagent.core :as r]
             ["@react-navigation/native" :as rnn]
             ["@react-navigation/native-stack" :as rnn-stack]
-            ["react-native-safe-area-context" :refer [useSafeAreaInsets]]
+
             ["@expo/vector-icons/Ionicons" :default Ionicons]
             ["expo-clipboard" :as Clipboard]))
 
@@ -270,8 +270,7 @@
                t (theme/use-theme)]
     (let [cid @current-id
           c (get @contacts cid)
-          msgs (:messages c [])
-          insets (useSafeAreaInsets)]
+          msgs (:messages c [])]
       [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
        [:> rn/View {:style {:padding-horizontal 16 :padding-vertical 12
                             :border-bottom-width 1 :border-bottom-color (:border t)
@@ -312,7 +311,7 @@
        [:> rn/View {:style {:flex-direction :row :align-items :center
                             :padding 12 :border-top-width 1
                             :border-top-color (:border t)
-                            :padding-bottom (+ 12 (.-bottom insets))}}
+                            :padding-bottom 24}}
         [:> rn/TextInput {:style {:flex 1 :border-width 1 :border-color (:border-input-alt t)
                                   :border-radius 20 :padding-horizontal 16
                                   :padding-vertical 12 :font-size 15 :margin-right 8

@@ -1,5 +1,6 @@
 (ns vygga.theme
-  (:require ["react-native" :as rn]))
+  (:require ["react-native" :as rn]
+            [reagent.core :as r]))
 
 (def light
   {:bg                   :white
@@ -59,6 +60,16 @@
    :header-bg            "#1E1E1E"
    :header-text          "#E0E0E0"})
 
+(defonce color-scheme
+  (r/atom (try (.getColorScheme rn/Appearance) (catch :default _ nil))))
+
+(defn- on-color-scheme-change [pref]
+  (reset! color-scheme (.-colorScheme ^js pref)))
+
+(defonce listener-registered
+  (do (try (.addChangeListener rn/Appearance on-color-scheme-change)
+           (catch :default _ nil))
+      true))
+
 (defn use-theme []
-  (let [scheme (rn/useColorScheme)]
-    (if (= scheme "dark") dark light)))
+  (if (= @color-scheme "dark") dark light))
