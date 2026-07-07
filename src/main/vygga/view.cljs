@@ -10,7 +10,8 @@
             ["@react-navigation/native" :as rnn]
             ["@react-navigation/native-stack" :as rnn-stack]
             ["react-native-safe-area-context" :refer [useSafeAreaInsets]]
-            ["@expo/vector-icons/Ionicons" :default Ionicons]))
+            ["@expo/vector-icons/Ionicons" :default Ionicons]
+            ["expo-clipboard" :as Clipboard]))
 
 (defonce Stack (rnn-stack/createNativeStackNavigator))
 
@@ -50,7 +51,10 @@
           (str "Peers: " peers)]
          [:> Ionicons {:name "settings-outline" :size 20 :color (:text-secondary t)}]]
         (when (and addr (not= addr ""))
-          [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t) :margin-left 8}} (subs addr 0 15)])]])))
+          [:> rn/TouchableOpacity {:on-press #(-> Clipboard (.setStringAsync addr))
+                                   :style {:flex-direction :row :align-items :center :margin-left 8}}
+           [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t)}} (subs addr 0 15)]
+           [:> Ionicons {:name "copy-outline" :size 12 :color (:text-tertiary t) :margin-left 4}]])]])))
 
 (defn settings []
   (r/with-let [status (rf/subscribe [:yggstack/status])
@@ -73,8 +77,11 @@
        [:> rn/Text {:style {:font-size 13 :color (:text-secondary t) :margin-bottom 4}}
         (str "Connected Peers: " @peer-count)]
        (when-let [addr @address]
-         [:> rn/Text {:style {:font-size 12 :color (:text-tertiary t)}}
-          (str "IPv6: " addr)])]
+          [:> rn/TouchableOpacity {:on-press #(-> Clipboard (.setStringAsync addr))
+                                   :style {:flex-direction :row :align-items :center}}
+           [:> rn/Text {:style {:font-size 12 :color (:text-tertiary t) :flex-shrink 1}}
+            (str "IPv6: " addr)]
+           [:> Ionicons {:name "copy-outline" :size 14 :color (:text-tertiary t) :margin-left 6}]])]
 
       (let [s @status]
         (if (= s :running)
