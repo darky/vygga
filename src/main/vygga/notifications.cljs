@@ -11,7 +11,7 @@
                                                    #js {:name "Messages"
                                                         :importance 6
                                                         :description "Incoming chat messages"
-                                                        :sound "default"
+                                                        :sound "music_marimba_chord"
                                                         :enableVibrate true})
         (.catch (fn [e]
                   (js/console.warn "Failed to create notification channel:" e))))))
@@ -39,7 +39,7 @@
   (-> (Notifications/scheduleNotificationAsync
        #js {:content #js {:title (or title "")
                           :body (or body "")
-                          :sound "default"}
+                          :sound "music_marimba_chord"}
             :trigger nil})
       (.catch (fn [e]
                 (js/console.warn "Failed to show notification:" e)))))
