@@ -237,7 +237,12 @@
 (rf/reg-event-db
  :messenger/restore-contacts
  (fn [db [_ contacts]]
-   (assoc-in db [:messenger :contacts] contacts)))
+   (let [enriched (reduce-kv (fn [acc k v]
+                               (assoc acc k (merge {:messages []
+                                                    :msg-index {}}
+                                                   (select-keys v [:name :address :public-key]))))
+                             {} contacts)]
+     (assoc-in db [:messenger :contacts] enriched))))
 
 (rf/reg-fx
  :messenger/save-contacts
@@ -295,7 +300,7 @@
               :id msg-id :ts ts
               :status :sending}]
      (if (and address text (seq text))
-       (let [msgs (get-in db [:messenger :contacts contact-id :messages])
+       (let [msgs (or (get-in db [:messenger :contacts contact-id :messages]) [])
              idx (count msgs)]
          {:db (-> db
                   (assoc-in [:messenger :contacts contact-id :messages] (conj msgs msg))
@@ -391,7 +396,7 @@
              (do
                (notifications/show! {:title sender-name :body text})
                (if contact-id
-                 (let [msgs (get-in db [:messenger :contacts contact-id :messages])
+                 (let [msgs (or (get-in db [:messenger :contacts contact-id :messages]) [])
                        idx (count msgs)]
                    {:db (-> db
                             (assoc-in [:messenger :contacts contact-id :messages] (conj msgs new-msg))

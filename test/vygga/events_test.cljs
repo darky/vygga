@@ -194,9 +194,12 @@
 (deftest test-messenger-restore-contacts
   (let [contacts {"cid1" {:name "Alice" :address "201::1"}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
-    (let [msngr (:messenger @rdb/app-db)]
+    (let [msngr (:messenger @rdb/app-db)
+          alice (get-in msngr [:contacts "cid1"])]
       (is (contains? (:contacts msngr) "cid1"))
-      (is (= "Alice" (get-in (:contacts msngr) ["cid1" :name]))))))
+      (is (= "Alice" (:name alice)))
+      (is (= [] (:messages alice)) "messages should be initialized to empty vector")
+      (is (= {} (:msg-index alice)) "msg-index should be initialized to empty map"))))
 
 (deftest test-messenger-receive-incoming-unsigned
   (rf/dispatch-sync [:messenger/receive-incoming
