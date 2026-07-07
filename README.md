@@ -79,7 +79,7 @@ Messages are JSON-serialized, Ed25519-signed, and sent through the SOCKS5 proxy 
 - **Java** 11+ (for shadow-cljs)
 - **Node.js** 18+ and npm
 - **Android SDK** (API 24+) and NDK — via [Android command-line tools](https://developer.android.com/tools) or Android Studio
-- **Go** 1.20+ (only if rebuilding the yggstack AAR)
+- **Go** 1.20+ (only if rebuilding the yggstack AAR; ensure `$(go env GOPATH)/bin` is on your `$PATH` for `gomobile`)
 - **Clojure CLI tools** (optional, for linting/formatting)
 
 ## Getting Started
@@ -90,6 +90,7 @@ npm i
 
 # 2. Build yggstack AAR (one-time, or after yggstack changes)
 cd vendor/yggstack
+export PATH="$(go env GOPATH)/bin:$PATH"
 ANDROID_HOME=$HOME/Library/Android/sdk ./mobile/build-android.sh
 cd ../..
 
