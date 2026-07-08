@@ -52,7 +52,7 @@
    :success              "#4CAF50"
    :warning              "#FF9800"
    :error                "#F44336"
-   :checkmark            "#0A84FF"
+   :checkmark            :white
    :empty-text           "#888"
    :cancel-text          "#888"
    :header-bg            "#1E1E1E"
