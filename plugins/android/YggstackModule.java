@@ -1,7 +1,5 @@
 package expo.modules.yggstack;
 
-import android.content.Intent;
-import android.os.Build;
 import android.util.Log;
 
 import com.facebook.react.bridge.Arguments;
@@ -10,21 +8,15 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
-import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.Socket;
-
 public class YggstackModule extends ReactContextBaseJavaModule implements LifecycleEventListener {
 
   private static final String TAG = "YggstackModule";
-  private YggdrasilService.MessageListener messageListener;
-  private YggdrasilService.LogListener logListener;
+  private MessengerServer.MessageListener messageListener;
+  private YggdrasilManager.LogListener logListener;
   private Runnable statusChangeListener;
 
   YggstackModule(ReactApplicationContext context) {
@@ -40,7 +32,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void generateConfig(Promise promise) {
     try {
-      promise.resolve(YggdrasilService.generateConfig());
+      promise.resolve(YggdrasilManager.generateConfig());
     } catch (Exception e) {
       promise.reject("YGGSTACK_GEN_CONFIG_ERROR", e.getMessage(), e);
     }
@@ -49,7 +41,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void start(String configJSON, String socksAddress, String nameserver, Promise promise) {
     try {
-      if (YggdrasilService.isRunning()) {
+      if (YggdrasilManager.isRunning()) {
         promise.resolve(true);
         return;
       }
@@ -75,13 +67,13 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @ReactMethod
   public void isRunning(Promise promise) {
-    promise.resolve(YggdrasilService.isRunning());
+    promise.resolve(YggdrasilManager.isRunning());
   }
 
   @ReactMethod
   public void addPeer(String uri, Promise promise) {
     try {
-      YggdrasilService.addPeer(uri);
+      YggdrasilManager.addPeer(uri);
       promise.resolve(true);
     } catch (Exception e) {
       promise.reject("YGGSTACK_ADD_PEER_ERROR", e.getMessage(), e);
@@ -91,7 +83,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void removePeer(String uri, Promise promise) {
     try {
-      YggdrasilService.removePeer(uri);
+      YggdrasilManager.removePeer(uri);
       promise.resolve(true);
     } catch (Exception e) {
       promise.reject("YGGSTACK_REMOVE_PEER_ERROR", e.getMessage(), e);
@@ -101,7 +93,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void getPeers(Promise promise) {
     try {
-      promise.resolve(YggdrasilService.getPeers());
+      promise.resolve(YggdrasilManager.getPeers());
     } catch (Exception e) {
       promise.reject("YGGSTACK_GET_PEERS_ERROR", e.getMessage(), e);
     }
@@ -110,7 +102,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void getAddress(Promise promise) {
     try {
-      promise.resolve(YggdrasilService.getAddress());
+      promise.resolve(YggdrasilManager.getAddress());
     } catch (Exception e) {
       promise.reject("YGGSTACK_GET_ADDRESS_ERROR", e.getMessage(), e);
     }
@@ -119,7 +111,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void getPublicKey(Promise promise) {
     try {
-      promise.resolve(YggdrasilService.getPublicKey());
+      promise.resolve(YggdrasilManager.getPublicKey());
     } catch (Exception e) {
       promise.reject("YGGSTACK_GET_PUBKEY_ERROR", e.getMessage(), e);
     }
@@ -128,7 +120,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void getPeersJSON(Promise promise) {
     try {
-      promise.resolve(YggdrasilService.getPeersJSON());
+      promise.resolve(YggdrasilManager.getPeersJSON());
     } catch (Exception e) {
       promise.reject("YGGSTACK_GET_PEERS_JSON_ERROR", e.getMessage(), e);
     }
@@ -137,7 +129,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void addRemoteTCPMapping(int remotePort, String localAddr, Promise promise) {
     try {
-      YggdrasilService.addRemoteTCPMapping(remotePort, localAddr);
+      YggdrasilManager.addRemoteTCPMapping(remotePort, localAddr);
       promise.resolve(true);
     } catch (Exception e) {
       promise.reject("YGGSTACK_REMOTE_MAP_ERROR", e.getMessage(), e);
@@ -147,7 +139,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void removeRemoteTCPMapping(int remotePort, String localAddr, Promise promise) {
     try {
-      YggdrasilService.removeRemoteTCPMapping(remotePort, localAddr);
+      YggdrasilManager.removeRemoteTCPMapping(remotePort, localAddr);
       promise.resolve(true);
     } catch (Exception e) {
       promise.reject("YGGSTACK_REMOVE_REMOTE_MAP_ERROR", e.getMessage(), e);
@@ -157,7 +149,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void clearRemoteMappings(Promise promise) {
     try {
-      YggdrasilService.clearRemoteMappings();
+      YggdrasilManager.clearRemoteMappings();
       promise.resolve(true);
     } catch (Exception e) {
       promise.reject("YGGSTACK_CLEAR_REMOTE_MAP_ERROR", e.getMessage(), e);
@@ -167,7 +159,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void startMessengerServer(int port, Promise promise) {
     try {
-      YggdrasilService.startMessengerServer(port);
+      MessengerServer.start(port, getReactApplicationContext());
       promise.resolve(true);
     } catch (Exception e) {
       Log.e(TAG, "Messenger server error", e);
@@ -177,7 +169,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @ReactMethod
   public void stopMessengerServer(Promise promise) {
-    YggdrasilService.stopMessengerServer();
+    MessengerServer.stop();
     promise.resolve(true);
   }
 
@@ -190,8 +182,8 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void pollPendingMessages(Promise promise) {
     try {
-      java.util.List<String> msgs = YggdrasilService.pollPendingMessages();
-      com.facebook.react.bridge.WritableArray arr = Arguments.createArray();
+      java.util.List<String> msgs = MessengerServer.pollPendingMessages();
+      WritableArray arr = Arguments.createArray();
       for (String msg : msgs) {
         arr.pushString(msg);
       }
@@ -201,63 +193,16 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     }
   }
 
-  // ---- SOCKS5 Message Sending (stays in module, doesn't need service) ----
-
   @ReactMethod
   public void sendMessage(String targetAddr, String message, Promise promise) {
     new Thread(() -> {
       try {
-        Socket socket = new Socket("127.0.0.1", 1080);
-        socket.setSoTimeout(10000);
-        OutputStream out = socket.getOutputStream();
-        InputStream in = socket.getInputStream();
-
-        out.write(new byte[]{0x05, 0x01, 0x00});
-        byte[] handshakeResp = new byte[2];
-        readFully(in, handshakeResp);
-        if (handshakeResp[0] != 0x05 || handshakeResp[1] != 0x00) {
-          throw new Exception("SOCKS5 handshake failed");
-        }
-
-        int port = 7777;
-        String ip = targetAddr.replace("[", "").replace("]", "");
-        InetAddress addr = InetAddress.getByName(ip);
-        byte[] addrBytes = addr.getAddress();
-
-        byte[] connectReq = new byte[addrBytes.length + 6];
-        connectReq[0] = 0x05;
-        connectReq[1] = 0x01;
-        connectReq[2] = 0x00;
-        connectReq[3] = addrBytes.length == 16 ? (byte) 0x04 : (byte) 0x01;
-        System.arraycopy(addrBytes, 0, connectReq, 4, addrBytes.length);
-        connectReq[connectReq.length - 2] = (byte) ((port >> 8) & 0xFF);
-        connectReq[connectReq.length - 1] = (byte) (port & 0xFF);
-        out.write(connectReq);
-
-        byte[] connectResp = new byte[10];
-        readFully(in, connectResp);
-        if (connectResp[0] != 0x05 || connectResp[1] != 0x00) {
-          throw new Exception("SOCKS5 connect failed, status: " + connectResp[1]);
-        }
-
-        byte[] msgBytes = (message + (char) 10).getBytes("UTF-8");
-        out.write(msgBytes);
-        out.flush();
-        socket.close();
+        MessengerClient.send(targetAddr, message);
         promise.resolve(true);
       } catch (Exception e) {
         promise.reject("SEND_MESSAGE_ERROR", e.getMessage(), e);
       }
     }).start();
-  }
-
-  private void readFully(InputStream in, byte[] buffer) throws Exception {
-    int offset = 0;
-    while (offset < buffer.length) {
-      int read = in.read(buffer, offset, buffer.length - offset);
-      if (read < 0) throw new Exception("Connection closed");
-      offset += read;
-    }
   }
 
   // ---- Event helpers ----
@@ -272,21 +217,21 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   private void sendStatusEvent() {
     WritableMap m = Arguments.createMap();
-    m.putBoolean("running", YggdrasilService.isRunning());
+    m.putBoolean("running", YggdrasilManager.isRunning());
     try {
-      String addr = YggdrasilService.getAddress();
+      String addr = YggdrasilManager.getAddress();
       m.putString("address", addr != null ? addr : "");
     } catch (Exception e) {
       m.putString("address", "");
     }
     try {
-      String pk = YggdrasilService.getPublicKey();
+      String pk = YggdrasilManager.getPublicKey();
       m.putString("publicKey", pk != null ? pk : "");
     } catch (Exception e) {
       m.putString("publicKey", "");
     }
     try {
-      String peersJson = YggdrasilService.getPeersJSON();
+      String peersJson = YggdrasilManager.getPeersJSON();
       m.putString("peersJSON", peersJson != null ? peersJson : "[]");
     } catch (Exception e) {
       m.putString("peersJSON", "[]");
@@ -300,18 +245,17 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   public void onHostResume() {
     if (messageListener == null) {
       messageListener = this::onMessengerMessage;
-      YggdrasilService.addMessageListener(messageListener);
+      MessengerServer.addMessageListener(messageListener);
     }
     if (logListener == null) {
       logListener = msg -> sendEvent("onYggstackLog", msg);
-      YggdrasilService.addLogListener(logListener);
+      YggdrasilManager.addLogListener(logListener);
     }
     if (statusChangeListener == null) {
       statusChangeListener = this::sendStatusEvent;
-      YggdrasilService.addStatusChangeListener(statusChangeListener);
+      YggdrasilManager.addStatusChangeListener(statusChangeListener);
     }
-    // Send current status so JS catches up after re-launch
-    if (YggdrasilService.isRunning()) {
+    if (YggdrasilManager.isRunning()) {
       sendStatusEvent();
     }
   }
@@ -321,17 +265,16 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @Override
   public void onHostDestroy() {
-    // Don't stop yggdrasil — the foreground service keeps it running
     if (messageListener != null) {
-      YggdrasilService.removeMessageListener(messageListener);
+      MessengerServer.removeMessageListener(messageListener);
       messageListener = null;
     }
     if (logListener != null) {
-      YggdrasilService.removeLogListener(logListener);
+      YggdrasilManager.removeLogListener(logListener);
       logListener = null;
     }
     if (statusChangeListener != null) {
-      YggdrasilService.removeStatusChangeListener(statusChangeListener);
+      YggdrasilManager.removeStatusChangeListener(statusChangeListener);
       statusChangeListener = null;
     }
   }

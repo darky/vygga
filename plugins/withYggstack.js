@@ -156,21 +156,15 @@ function withYggstackModuleSources(config) {
       );
       if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir, { recursive: true });
 
-      const moduleCode = fs.readFileSync(path.join(YGGSTACK_JAVA_SRC, 'YggstackModule.java'), 'utf8');
-      const moduleFile = path.join(srcDir, 'YggstackModule.java');
-      fs.writeFileSync(moduleFile, moduleCode, 'utf8');
-      console.log('[withYggstack] Created YggstackModule.java');
-
-      const serviceCode = fs.readFileSync(path.join(YGGSTACK_JAVA_SRC, 'YggdrasilService.java'), 'utf8');
-      const serviceFile = path.join(srcDir, 'YggdrasilService.java');
-      fs.writeFileSync(serviceFile, serviceCode, 'utf8');
-      console.log('[withYggstack] Created YggdrasilService.java');
-
-      const packageCode = fs.readFileSync(path.join(YGGSTACK_JAVA_SRC, 'YggstackPackage.java'), 'utf8');
-      const packageFile = path.join(srcDir, 'YggstackPackage.java');
-      if (!fs.existsSync(packageFile)) {
-        fs.writeFileSync(packageFile, packageCode, 'utf8');
-        console.log('[withYggstack] Created YggstackPackage.java');
+      const javaFiles = fs.readdirSync(YGGSTACK_JAVA_SRC)
+        .filter(f => f.endsWith('.java'));
+      for (const file of javaFiles) {
+        const code = fs.readFileSync(path.join(YGGSTACK_JAVA_SRC, file), 'utf8');
+        const dest = path.join(srcDir, file);
+        // Only overwrite YggstackPackage.java if it doesn't exist (user may customise)
+        if (file === 'YggstackPackage.java' && fs.existsSync(dest)) continue;
+        fs.writeFileSync(dest, code, 'utf8');
+        console.log(`[withYggstack] Created ${file}`);
       }
 
       return cfg;
