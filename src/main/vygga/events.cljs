@@ -211,17 +211,13 @@
 
 (rf/reg-event-fx
  :messenger/add-contact
- (fn [{db :db} [_ {:keys [id address]}]]
-   (let [addr-index (get-in db [:messenger :contact-addr-index])]
-     (if (get addr-index address)
-       {:db db}
-       (let [cid (or id (str (random-uuid)))]
-         {:db (-> db
-                  (assoc-in [:messenger :contacts cid]
-                            {:address address
-                             :messages [] :msg-index {}})
-                  (assoc-in [:messenger :contact-addr-index address] cid))
-          :messenger/save-contacts nil})))))
+ (fn [{db :db} [_ {:keys [address]}]]
+   (if (get-in db [:messenger :contacts address])
+     {:db db}
+     {:db (assoc-in db [:messenger :contacts address]
+                    {:address address
+                     :messages [] :msg-index {}})
+      :messenger/save-contacts nil})))
 
 (rf/reg-event-fx
  :messenger/set-current-contact
@@ -242,25 +238,13 @@
 (rf/reg-event-db
  :messenger/restore-contacts
  (fn [db [_ contacts]]
-   (let [sorted (sort-by (fn [[_ v]] (:address v)) contacts)
-         deduped (reduce (fn [[deduped seen] [k v]]
-                           (let [addr (:address v)]
-                             (if (contains? seen addr)
-                               [deduped seen]
-                               [(assoc deduped k
-                                       (merge {:messages []
-                                               :msg-index {}}
-                                              (select-keys v [:address :public-key])))
-                                (conj seen addr)])))
-                         [{} #{}]
-                         sorted)
-         enriched (first deduped)
-         addr-index (reduce-kv (fn [acc k v]
-                                 (assoc acc (:address v) k))
-                               {} enriched)]
-     (-> db
-         (assoc-in [:messenger :contacts] enriched)
-         (assoc-in [:messenger :contact-addr-index] addr-index)))))
+   (let [rekeyed (reduce-kv (fn [acc _ v]
+                              (assoc acc (:address v)
+                                     (merge {:messages []
+                                             :msg-index {}}
+                                            (select-keys v [:address :public-key]))))
+                            {} contacts)]
+     (assoc-in db [:messenger :contacts] rekeyed))))
 
 (rf/reg-fx
  :messenger/save-contacts
@@ -398,43 +382,27 @@
      :else
      (let [data-to-verify (str text "|" id "|" ts)]
        (if (crypto/verify-signature pubkey data-to-verify sig)
-         (let [addr-index (get-in db [:messenger :contact-addr-index])
-               contact-id (get addr-index from-addr)
-               contacts (get-in db [:messenger :contacts])
-               pubkey-mismatch (and contact-id
-                                    (get-in contacts [contact-id :public-key])
-                                    (not= pubkey (get-in contacts [contact-id :public-key])))
+         (let [contacts (get-in db [:messenger :contacts])
+               existing (get contacts from-addr)
+               pubkey-mismatch (and existing
+                                    (:public-key existing)
+                                    (not= pubkey (:public-key existing)))
                new-msg {:text text :from-me false
                         :id id :ts ts}]
            (if pubkey-mismatch
              (js/console.warn "Public key mismatch for" from-addr)
-             (if contact-id
-               (let [msgs (or (get-in db [:messenger :contacts contact-id :messages]) [])
+             (if existing
+               (let [msgs (or (:messages existing) [])
                      idx (count msgs)]
                  {:db (-> db
-                          (assoc-in [:messenger :contacts contact-id :messages] (conj msgs new-msg))
-                          (assoc-in [:messenger :contacts contact-id :msg-index id] idx)
-                          (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
+                          (assoc-in [:messenger :contacts from-addr :messages] (conj msgs new-msg))
+                          (assoc-in [:messenger :contacts from-addr :msg-index id] idx)
+                          (assoc-in [:messenger :contacts from-addr :public-key] pubkey))
                   :messenger/save-contacts nil})
-               (let [fallback-id (some (fn [[cid c]]
-                                         (when (= from-addr (:address c)) cid))
-                                       contacts)]
-                 (if fallback-id
-                   (let [msgs (or (get-in db [:messenger :contacts fallback-id :messages]) [])
-                         idx (count msgs)]
-                     {:db (-> db
-                              (assoc-in [:messenger :contacts fallback-id :messages]
-                                        (conj msgs new-msg))
-                              (assoc-in [:messenger :contacts fallback-id :msg-index id] idx)
-                              (assoc-in [:messenger :contacts fallback-id :public-key] pubkey)
-                              (assoc-in [:messenger :contact-addr-index from-addr] fallback-id))
-                      :messenger/save-contacts nil})
-                   {:db (-> db
-                            (assoc-in [:messenger :contacts from-addr]
-                                      {:address from-addr
-                                       :public-key pubkey
-                                       :messages [new-msg]
-                                       :msg-index {id 0}})
-                            (assoc-in [:messenger :contact-addr-index from-addr] from-addr))
-                    :messenger/save-contacts nil})))))
+               {:db (assoc-in db [:messenger :contacts from-addr]
+                              {:address from-addr
+                               :public-key pubkey
+                               :messages [new-msg]
+                               :msg-index {id 0}})
+                :messenger/save-contacts nil})))
          (js/console.warn "Invalid signature from" from-addr))))))

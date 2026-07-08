@@ -162,33 +162,26 @@
   (is (contains? @captured :messenger/stop-tcp-server)))
 
 (deftest test-messenger-add-contact
-  (let [contact {:address "201:abcd::1"}]
-    (rf/dispatch-sync [:messenger/add-contact contact])
+  (let [addr "201:abcd::1"]
+    (rf/dispatch-sync [:messenger/add-contact {:address addr}])
     (let [contacts (get-in @rdb/app-db [:messenger :contacts])
-          addr-index (get-in @rdb/app-db [:messenger :contact-addr-index])]
+          c (get contacts addr)]
       (is (= 1 (count contacts)))
-      (is (= (ffirst contacts) (get addr-index "201:abcd::1")))
-      (let [[cid c] (first contacts)]
-        (is (string? cid))
-        (is (not (contains? c :name)))
-        (is (= "201:abcd::1" (:address c)))
-        (is (= [] (:messages c)))
-        (is (= {} (:msg-index c))))))
+      (is (contains? contacts addr))
+      (is (not (contains? c :name)))
+      (is (= addr (:address c)))
+      (is (= [] (:messages c)))
+      (is (= {} (:msg-index c)))))
   (is (contains? @captured :messenger/save-contacts)))
 
 (deftest test-messenger-add-contact-duplicate
   (let [addr "201:abcd::1"]
     (rf/dispatch-sync [:messenger/add-contact {:address addr}])
-    (let [contacts-after-first (get-in @rdb/app-db [:messenger :contacts])
-          first-cid (ffirst contacts-after-first)]
-      (is (= 1 (count contacts-after-first)))
-      (reset! captured {})
-      (rf/dispatch-sync [:messenger/add-contact {:address addr}])
-      (let [contacts (get-in @rdb/app-db [:messenger :contacts])
-            addr-index (get-in @rdb/app-db [:messenger :contact-addr-index])]
-        (is (= 1 (count contacts)) "duplicate add should not create a second contact")
-        (is (= first-cid (ffirst contacts)) "the contact should be unchanged")
-        (is (= first-cid (get addr-index addr)) "index should still point to the original cid")))))
+    (reset! captured {})
+    (rf/dispatch-sync [:messenger/add-contact {:address addr}])
+    (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
+      (is (= 1 (count contacts)) "duplicate add should not create a second contact")
+      (is (contains? contacts addr) "contact should be keyed by address"))))
 
 (deftest test-messenger-set-current-contact
   (let [cid "test-contact-1"]
@@ -270,31 +263,28 @@
   (let [contacts {"cid1" {:address "201::1"} "cid2" {:address "201::2"}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
     (let [msngr (:messenger @rdb/app-db)
-          alice (get-in msngr [:contacts "cid1"])
-          bob (get-in msngr [:contacts "cid2"])
-          index (get-in msngr [:contact-addr-index])]
-      (is (contains? (:contacts msngr) "cid1"))
+          alice (get-in msngr [:contacts "201::1"])
+          bob (get-in msngr [:contacts "201::2"])]
+      (is (= 2 (count (:contacts msngr))))
+      (is (contains? (:contacts msngr) "201::1"))
       (is (= "201::1" (:address alice)))
       (is (not (contains? alice :name)))
       (is (= [] (:messages alice)) "messages should be initialized to empty vector")
       (is (= {} (:msg-index alice)) "msg-index should be initialized to empty map")
-      (is (contains? (:contacts msngr) "cid2"))
+      (is (contains? (:contacts msngr) "201::2"))
       (is (= "201::2" (:address bob)))
-      (is (= "cid1" (get index "201::1")) "contact-addr-index should map address to cid")
-      (is (= "cid2" (get index "201::2")) "contact-addr-index should map address to cid"))))
+      (is (not (contains? (:contacts msngr) "cid1")) "old UUID key should be re-keyed to address")
+      (is (not (contains? (:contacts msngr) "cid2")) "old UUID key should be re-keyed to address"))))
 
 (deftest test-messenger-restore-contacts-dedup
   (let [contacts {"cid1" {:address "201::1"}
-                  "cid2" {:address "201::1"} ;; duplicate address
+                  "cid2" {:address "201::1"} ;; duplicate address — last-wins
                   "cid3" {:address "201::2"}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
-    (let [msngr (:messenger @rdb/app-db)]
-      (is (= 2 (count (:contacts msngr))) "should keep only 1 contact per address")
-      (is (= "201::1" (:address (val (first (:contacts msngr))))))
-      (is (= "201::2" (:address (val (second (:contacts msngr))))))
-      (is (= 2 (count (get-in msngr [:contact-addr-index]))) "index should have 2 entries")
-      (is (get (get-in msngr [:contact-addr-index]) "201::1"))
-      (is (get (get-in msngr [:contact-addr-index]) "201::2")))))
+    (let [contacts-map (get-in @rdb/app-db [:messenger :contacts])]
+      (is (= 2 (count contacts-map)) "re-keying deduplicates by address")
+      (is (contains? contacts-map "201::1"))
+      (is (contains? contacts-map "201::2")))))
 
 (deftest test-messenger-receive-incoming-unsigned
   (rf/dispatch-sync [:messenger/receive-incoming
@@ -327,23 +317,20 @@
       (is (contains? @captured :messenger/save-contacts)))
     (testing "existing sender appends message"
       (let [address "201:bbbb::1"
-            existing-cid "existing-contact"
             msg2-text "Second msg"
             msg2-id "fresh-id-2"
             msg2-ts 6000
             data2-to-sign (str msg2-text "|" msg2-id "|" msg2-ts)
             sig2 (crypto/sign-message privkey data2-to-sign)
-            db-with-contact (-> app-db
-                                (assoc-in [:messenger :contacts existing-cid]
-                                          {:address address
-                                           :messages [{:text "prev"}]})
-                                (assoc-in [:messenger :contact-addr-index address]
-                                          existing-cid))]
+            db-with-contact (assoc-in app-db
+                                      [:messenger :contacts address]
+                                      {:address address
+                                       :messages [{:text "prev"}]})]
         (reset! rdb/app-db db-with-contact)
         (reset! captured {})
         (rf/dispatch-sync [:messenger/receive-incoming
                            address msg2-text msg2-id msg2-ts pubkey sig2])
-        (let [msgs (get-in @rdb/app-db [:messenger :contacts existing-cid :messages])]
+        (let [msgs (get-in @rdb/app-db [:messenger :contacts address :messages])]
           (is (= 2 (count msgs)))
           (is (= "Second msg" (:text (last msgs))))
           (is (false? (:from-me (last msgs)))))
