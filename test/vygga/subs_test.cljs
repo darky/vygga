@@ -42,3 +42,15 @@
 (deftest test-messenger-current-contact
   (reset! rdb/app-db (assoc-in app-db [:messenger :current-contact] "cid1"))
   (is (= "cid1" @(rf/subscribe [:messenger/current-contact]))))
+
+(deftest test-messenger-sorted-contacts
+  (let [contacts {"b" {:address "201::b"}
+                  "a" {:address "201::a"}
+                  "c" {:address "201::c"}}]
+    (reset! rdb/app-db (assoc-in app-db [:messenger :contacts] contacts))
+    (let [sorted @(rf/subscribe [:messenger/sorted-contacts])]
+      (is (= 3 (count sorted)))
+      (is (= "a" (first (first sorted))))
+      (is (= "201::c" (:address (second (last sorted)))))
+      (is (= ["201::a" "201::b" "201::c"]
+             (map (fn [[_ c]] (:address c)) sorted))))))

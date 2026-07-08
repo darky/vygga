@@ -61,6 +61,13 @@
   (is (= :starting (get-in @rdb/app-db [:yggstack :status])))
   (is (contains? @captured :yggstack/generate-key)))
 
+(deftest test-yggstack-generate-new-identity
+  (let [db-with-key (assoc-in app-db [:yggstack :private-key] "old-key")]
+    (reset! rdb/app-db db-with-key)
+    (rf/dispatch-sync [:yggstack/generate-new-identity])
+    (is (nil? (get-in @rdb/app-db [:yggstack :private-key])))
+    (is (contains? @captured :yggstack/regenerate-identity))))
+
 (deftest test-yggstack-set-status-running
   (rf/dispatch-sync [:yggstack/set-status :running])
   (is (= :running (get-in @rdb/app-db [:yggstack :status])))
@@ -123,6 +130,36 @@
   (let [target (first default-peers)]
     (rf/dispatch-sync [:yggstack/remove-peer target])
     (is (not-any? #(= target %) (get-in @rdb/app-db [:yggstack :peers])))))
+
+(deftest test-yggstack-start-foreground-service
+  (rf/dispatch-sync [:yggstack/start-foreground-service])
+  (is (contains? @captured :yggstack/start-foreground-service)))
+
+(deftest test-yggstack-stop-foreground-service
+  (rf/dispatch-sync [:yggstack/stop-foreground-service])
+  (is (contains? @captured :yggstack/stop-foreground-service)))
+
+(deftest test-yggstack-battery-opt-out
+  (rf/dispatch-sync [:yggstack/battery-opt-out])
+  (is (contains? @captured :yggstack/battery-opt-out-fx)))
+
+(deftest test-app-exit
+  (rf/dispatch-sync [:app/exit])
+  (is (contains? @captured :app/exit-fx)))
+
+(deftest test-messenger-start-server-standalone
+  (reset! rdb/app-db (assoc-in app-db [:messenger :server-port] 9999))
+  (rf/dispatch-sync [:messenger/start-server])
+  (is (= true (get-in @rdb/app-db [:messenger :server-running])))
+  (let [opts (get @captured :messenger/start-tcp-server)]
+    (is (map? opts))
+    (is (= 9999 (:port opts)))))
+
+(deftest test-messenger-stop-server-standalone
+  (reset! rdb/app-db (assoc-in app-db [:messenger :server-running] true))
+  (rf/dispatch-sync [:messenger/stop-server])
+  (is (= false (get-in @rdb/app-db [:messenger :server-running])))
+  (is (contains? @captured :messenger/stop-tcp-server)))
 
 (deftest test-messenger-add-contact
   (let [contact {:address "201:abcd::1"}]

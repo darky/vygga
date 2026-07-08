@@ -127,6 +127,15 @@
   (let [result (view/root)]
     (is (some? result))))
 
+(deftest test-contact-item-smoke
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (view/contact-item props "c1" {:address "201::1"})]
+    (is (some? result))))
+
+(deftest test-message-bubble-smoke
+  (let [result (view/message-bubble {:id "m1" :text "hi" :from-me true :status :sent :cid "c1"})]
+    (is (some? result))))
+
 ;; ---- Event dispatching integration tests ----
 
 (deftest test-settings-start-dispatches
