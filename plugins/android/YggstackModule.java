@@ -188,12 +188,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   public void removeListeners(int count) {}
 
   @ReactMethod
-  public void setJsActive(boolean active, Promise promise) {
-    YggdrasilService.setJsActive(active);
-    promise.resolve(true);
-  }
-
-  @ReactMethod
   public void pollPendingMessages(Promise promise) {
     try {
       java.util.List<String> msgs = YggdrasilService.pollPendingMessages();
@@ -304,7 +298,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @Override
   public void onHostResume() {
-    YggdrasilService.setJsActive(true);
     if (messageListener == null) {
       messageListener = this::onMessengerMessage;
       YggdrasilService.addMessageListener(messageListener);
@@ -328,7 +321,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @Override
   public void onHostDestroy() {
-    YggdrasilService.setJsActive(false);
     // Don't stop yggdrasil — the foreground service keeps it running
     if (messageListener != null) {
       YggdrasilService.removeMessageListener(messageListener);

@@ -7,7 +7,6 @@ var stubDir = path.resolve(__dirname, '../stubs/node_modules');
 var stubModules = {
   'react-native': true,
   'expo-secure-store': true,
-  'expo-notifications': true,
   'react-native-battery-optimization-check': true,
   'expo-status-bar': true,
   '@react-navigation/native': true,

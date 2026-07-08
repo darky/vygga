@@ -51,7 +51,6 @@ public class YggdrasilService extends Service {
   private static String lastSocksAddress;
   private static String lastNameserver;
 
-  private static boolean jsActive = false;
   private static int msgNotifId = 1000;
   private static Context appContext;
 
@@ -87,10 +86,6 @@ public class YggdrasilService extends Service {
     List<String> batch = new java.util.ArrayList<>(pendingMessages);
     pendingMessages.clear();
     return batch;
-  }
-
-  public static void setJsActive(boolean active) {
-    jsActive = active;
   }
 
   private static String extractQuoted(String raw, Pattern p) {
@@ -287,7 +282,7 @@ public class YggdrasilService extends Service {
               while ((line = reader.readLine()) != null) {
                 final String msg = line;
                 pendingMessages.add(msg);
-                if (!jsActive && appContext != null) {
+                if (appContext != null) {
                   showMessageNotification(appContext, msg);
                 }
                 for (MessageListener l : messageListeners) {

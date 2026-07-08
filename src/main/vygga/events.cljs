@@ -6,7 +6,6 @@
    ["expo-secure-store" :as secure-store]
    [vygga.yggstack :as ygg]
    [vygga.messenger :as msg]
-   [vygga.notifications :as notifications]
    [vygga.crypto :as crypto]
    [vygga.storage :as storage]
    [vygga.db :as db :refer [app-db]]))
@@ -396,23 +395,21 @@
                         :id id :ts ts}]
            (if pubkey-mismatch
              (js/console.warn "Public key mismatch for" from-addr)
-             (do
-               (notifications/show! {:title sender-name :body text})
-               (if contact-id
-                 (let [msgs (or (get-in db [:messenger :contacts contact-id :messages]) [])
-                       idx (count msgs)]
-                   {:db (-> db
-                            (assoc-in [:messenger :contacts contact-id :messages] (conj msgs new-msg))
-                            (assoc-in [:messenger :contacts contact-id :msg-index id] idx)
-                            (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
-                    :messenger/save-contacts nil})
+             (if contact-id
+               (let [msgs (or (get-in db [:messenger :contacts contact-id :messages]) [])
+                     idx (count msgs)]
                  {:db (-> db
-                          (assoc-in [:messenger :contacts from-addr]
-                                    {:name sender-name
-                                     :address from-addr
-                                     :public-key pubkey
-                                     :messages [new-msg]
-                                     :msg-index {id 0}})
-                          (assoc-in [:messenger :contact-addr-index from-addr] from-addr))
-                  :messenger/save-contacts nil}))))
+                          (assoc-in [:messenger :contacts contact-id :messages] (conj msgs new-msg))
+                          (assoc-in [:messenger :contacts contact-id :msg-index id] idx)
+                          (assoc-in [:messenger :contacts contact-id :public-key] pubkey))
+                  :messenger/save-contacts nil})
+               {:db (-> db
+                        (assoc-in [:messenger :contacts from-addr]
+                                  {:name sender-name
+                                   :address from-addr
+                                   :public-key pubkey
+                                   :messages [new-msg]
+                                   :msg-index {id 0}})
+                        (assoc-in [:messenger :contact-addr-index from-addr] from-addr))
+                :messenger/save-contacts nil})))
          (js/console.warn "Invalid signature from" from-addr))))))

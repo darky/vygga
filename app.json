@@ -23,8 +23,7 @@
     "plugins": [
       "./plugins/withYggstack",
       "./plugins/withNotificationSound",
-      "expo-secure-store",
-      "expo-notifications"
+      "expo-secure-store"
     ],
     "android": {
       "package": "com.vygga.app"
