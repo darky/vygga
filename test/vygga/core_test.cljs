@@ -6,8 +6,11 @@
 
 (deftest test-app-db-shape
   (testing "app-db has expected top-level keys"
+    (is (contains? db/app-db :preferred-scheme))
     (is (contains? db/app-db :yggstack))
     (is (contains? db/app-db :messenger)))
+  (testing "preferred-scheme defaults to :dark"
+    (is (= :dark (:preferred-scheme db/app-db))))
   (testing "yggstack submap"
     (let [ys (:yggstack db/app-db)]
       (is (= :stopped (:status ys)))
@@ -29,6 +32,12 @@
     (is (= 4 (count db/default-peers)))
     (doseq [peer db/default-peers]
       (is (.startsWith peer "tls://")))))
+
+(deftest test-use-theme-returns-correct-maps
+  (testing "use-theme with :dark returns the dark map"
+    (is (= theme/dark (theme/use-theme :dark))))
+  (testing "use-theme with :light returns the light map"
+    (is (= theme/light (theme/use-theme :light)))))
 
 (deftest test-theme-keys
   (testing "light and dark themes have same keys"

@@ -26,7 +26,8 @@
   (r/with-let [status (rf/subscribe [:yggstack/status])
                peer-count (rf/subscribe [:yggstack/peer-count])
                address (rf/subscribe [:yggstack/address])
-               t (theme/use-theme)]
+               pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     (let [s @status
           [color label] (status-label s t)
           peers @peer-count
@@ -62,7 +63,8 @@
                address (rf/subscribe [:yggstack/address])
                peer-count (rf/subscribe [:yggstack/peer-count])
                *new-peer (r/atom "")
-               t (theme/use-theme)]
+               pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
      [:> rn/ScrollView {:style {:flex 1 :padding 16}}
       [:> rn/View {:style {:background-color (:bg-card t) :padding 16 :border-radius 12 :margin-bottom 16}}
@@ -82,6 +84,15 @@
           [:> rn/Text {:style {:font-size 12 :color (:text-tertiary t) :flex-shrink 1}}
            (str "IPv6: " addr)]
           [:> Ionicons {:name "copy-outline" :size 14 :color (:text-tertiary t) :margin-left 6}]])]
+
+      [:> rn/View {:style {:background-color (:bg-card t) :padding 16 :border-radius 12 :margin-bottom 16}}
+       [:> rn/Text {:style {:font-size 18 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
+        "Appearance"]
+       [:> rn/View {:style {:flex-direction :row :align-items :center :justify-content :space-between}}
+        [:> rn/Text {:style {:font-size 16 :color (:text-primary t)}} "Dark Mode"]
+        [:> rn/Switch {:value (= @pref :dark)
+                       :on-value-change #(rf/dispatch [:theme/set-scheme (if % :dark :light)])
+                       :track-color {:true (:accent t) :false (:disabled t)}}]]]
 
       (let [s @status]
         (if (= s :running)
@@ -164,14 +175,16 @@
                      :number-of-lines 1} preview])]]))
 
 (defn contact-item [^js props contact-id {:keys [address last-message]}]
-  (r/with-let [t (theme/use-theme)]
+  (r/with-let [pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     (contact-item-render props contact-id {:address address :last-message last-message} t)))
 
 (defn contacts [props]
   (r/with-let [sorted-contacts (rf/subscribe [:messenger/sorted-contacts])
                *show-add (r/atom false)
                *new-addr (r/atom "")
-               t (theme/use-theme)]
+               pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
      [status-indicator props]
      [:> rn/ScrollView {:style {:flex 1 :padding-bottom 90}}
@@ -249,13 +262,15 @@
         "Resend"]]])])
 
 (defn message-bubble [{:keys [id text from-me status cid]}]
-  (r/with-let [t (theme/use-theme)]
+  (r/with-let [pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     (message-bubble-render {:id id :text text :from-me from-me :status status :cid cid} t)))
 
 (defn message-input [cid]
   (r/with-let [*text (r/atom "")
                *ref (r/atom nil)
-               t (theme/use-theme)]
+               pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     [:> rn/View {:style {:flex-direction :row :align-items :center
                          :padding 12 :border-top-width 1
                          :border-top-color (:border t)
@@ -291,7 +306,8 @@
                contacts (rf/subscribe [:messenger/contacts])
                *flat-ref (r/atom nil)
                *at-bottom (r/atom true)
-               t (theme/use-theme)]
+               pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     (let [cid @current-id
           c (get @contacts cid)
           msgs (:messages c [])]
@@ -342,7 +358,8 @@
                add-listener! (fn [^js navigation-ref]
                                (when navigation-ref
                                  (.addListener navigation-ref "state" save-root-state!)))
-               t (theme/use-theme)]
+               pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     [:> rnn/NavigationContainer {:ref add-listener!
                                  :initialState (when @!root-state (-> @!root-state .-data .-state))}
      [:> Stack.Navigator

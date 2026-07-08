@@ -206,3 +206,19 @@
 (deftest test-yggstack-update-address
   (rf/dispatch-sync [:yggstack/update-address "201:abcd::1234"])
   (is (= "201:abcd::1234" (get-in @rdb/app-db [:yggstack :address]))))
+
+(deftest test-theme-set-scheme-dark
+  (reset! rdb/app-db (assoc app-db :preferred-scheme :light))
+  (rf/dispatch-sync [:theme/set-scheme :dark])
+  (is (= :dark (:preferred-scheme @rdb/app-db))))
+
+(deftest test-theme-set-scheme-light
+  (reset! rdb/app-db (assoc app-db :preferred-scheme :dark))
+  (rf/dispatch-sync [:theme/set-scheme :light])
+  (is (= :light (:preferred-scheme @rdb/app-db))))
+
+(deftest test-theme-preferred-scheme-sub
+  (reset! rdb/app-db (assoc app-db :preferred-scheme :light))
+  (is (= :light @(rf/subscribe [:theme/preferred-scheme])))
+  (reset! rdb/app-db (assoc app-db :preferred-scheme :dark))
+  (is (= :dark @(rf/subscribe [:theme/preferred-scheme]))))

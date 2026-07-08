@@ -1,12 +1,14 @@
 (ns vygga.widgets
   (:require [vygga.theme :as theme]
+            [re-frame.core :as rf]
             [reagent.core :as r]
             ["react-native" :as rn]))
 
 (defn button [{:keys [style text-style on-press
                       disabled? disabled-style disabled-text-style]
                :or {on-press #()}} text]
-  (r/with-let [t (theme/use-theme)]
+  (r/with-let [pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
     [:> rn/Pressable {:style (cond-> {:font-weight      :bold
                                       :font-size        18
                                       :padding          6

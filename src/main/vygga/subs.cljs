@@ -37,6 +37,11 @@
    (get-in db [:messenger :current-contact])))
 
 (rf/reg-sub
+ :theme/preferred-scheme
+ (fn [db _]
+   (:preferred-scheme db)))
+
+(rf/reg-sub
  :messenger/sorted-contacts
  (fn [db _]
    (->> (get-in db [:messenger :contacts])

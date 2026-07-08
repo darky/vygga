@@ -10,6 +10,11 @@
    [vygga.storage :as storage]
    [vygga.db :as db :refer [app-db]]))
 
+(rf/reg-event-db
+ :theme/set-scheme
+ (fn [db [_ scheme]]
+   (assoc db :preferred-scheme scheme)))
+
 (rf/reg-event-fx
  :initialize-db
  (fn [_ _]
