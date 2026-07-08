@@ -136,6 +136,10 @@
   (let [result (view/message-bubble {:id "m1" :text "hi" :from-me true :status :sent :cid "c1"})]
     (is (some? result))))
 
+(deftest test-message-input-smoke
+  (let [result (view/message-input "test-cid")]
+    (is (some? result))))
+
 ;; ---- Event dispatching integration tests ----
 
 (deftest test-settings-start-dispatches

@@ -252,10 +252,43 @@
   (r/with-let [t (theme/use-theme)]
     (message-bubble-render {:id id :text text :from-me from-me :status status :cid cid} t)))
 
+(defn message-input [cid]
+  (r/with-let [*text (r/atom "")
+               *ref (r/atom nil)
+               t (theme/use-theme)]
+    [:> rn/View {:style {:flex-direction :row :align-items :center
+                         :padding 12 :border-top-width 1
+                         :border-top-color (:border t)
+                         :padding-bottom 48}}
+     [:> rn/TextInput {:key "message-input"
+                       :style {:flex 1 :border-width 1 :border-color (:border-input-alt t)
+                               :border-radius 20 :padding-horizontal 16
+                               :padding-vertical 14 :font-size 15 :margin-right 8
+                               :min-height 44 :max-height 120 :color (:text-primary t)}
+                       :placeholder "Type a message..."
+                       :placeholder-text-color (:text-tertiary t)
+                       :multiline true
+                       :default-value ""
+                       :ref #(reset! *ref %)
+                       :on-change-text #(reset! *text %)
+                       :on-submit-editing #(when (seq @*text)
+                                             (rf/dispatch [:messenger/send-message cid @*text])
+                                             (reset! *text "")
+                                             (when-let [r @*ref] (.clear r)))}]
+     [:> rn/Pressable {:style {:width 40 :height 40 :border-radius 20
+                               :background-color (:accent t) :justify-content :center
+                               :align-items :center}
+                       :on-press (fn []
+                                   (let [t @*text]
+                                     (when (seq t)
+                                       (rf/dispatch [:messenger/send-message cid t])
+                                       (reset! *text "")
+                                       (when-let [r @*ref] (.clear r)))))}
+      [:> rn/Text {:style {:color (:text-inverse t) :font-size 18}} "➤"]]]))
+
 (defn chat []
   (r/with-let [current-id (rf/subscribe [:messenger/current-contact])
                contacts (rf/subscribe [:messenger/contacts])
-               *text (r/atom "")
                *flat-ref (r/atom nil)
                *at-bottom (r/atom true)
                t (theme/use-theme)]
@@ -299,31 +332,7 @@
                               [message-bubble
                                {:id id :text text :from-me from-me
                                 :status status :cid cid}])))}])
-        [:> rn/View {:style {:flex-direction :row :align-items :center
-                             :padding 12 :border-top-width 1
-                             :border-top-color (:border t)
-                             :padding-bottom 48}}
-         [:> rn/TextInput {:style {:flex 1 :border-width 1 :border-color (:border-input-alt t)
-                                   :border-radius 20 :padding-horizontal 16
-                                   :padding-vertical 14 :font-size 15 :margin-right 8
-                                   :min-height 44 :max-height 120 :color (:text-primary t)}
-                           :placeholder "Type a message..."
-                           :placeholder-text-color (:text-tertiary t)
-                           :multiline true
-                           :value @*text
-                           :on-change-text #(reset! *text %)
-                           :on-submit-editing #(when (seq @*text)
-                                                 (rf/dispatch [:messenger/send-message cid @*text])
-                                                 (reset! *text ""))}]
-         [:> rn/Pressable {:style {:width 40 :height 40 :border-radius 20
-                                   :background-color (:accent t) :justify-content :center
-                                   :align-items :center}
-                           :on-press (fn []
-                                       (let [t @*text]
-                                         (when (seq t)
-                                           (rf/dispatch [:messenger/send-message cid t])
-                                           (reset! *text ""))))}
-          [:> rn/Text {:style {:color (:text-inverse t) :font-size 18}} "➤"]]]
+        [message-input cid]
         [:> StatusBar {:style "auto"}]]])))
 
 (defn root []
