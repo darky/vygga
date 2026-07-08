@@ -258,6 +258,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     if (YggdrasilManager.isRunning()) {
       sendStatusEvent();
     }
+    onNewMessageAvailable();
   }
 
   @Override
