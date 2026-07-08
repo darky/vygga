@@ -211,11 +211,11 @@
 
 (rf/reg-event-fx
  :messenger/add-contact
- (fn [{db :db} [_ {:keys [id name address]}]]
+ (fn [{db :db} [_ {:keys [id address]}]]
    (let [cid (or id (str (random-uuid)))]
      {:db (-> db
               (assoc-in [:messenger :contacts cid]
-                        {:name name :address address
+                        {:address address
                          :messages [] :msg-index {}})
               (assoc-in [:messenger :contact-addr-index address] cid))
       :messenger/save-contacts nil})))
@@ -242,7 +242,7 @@
    (let [enriched (reduce-kv (fn [acc k v]
                                (assoc acc k (merge {:messages []
                                                     :msg-index {}}
-                                                   (select-keys v [:name :address :public-key]))))
+                                                   (select-keys v [:address :public-key]))))
                              {} contacts)]
      (assoc-in db [:messenger :contacts] enriched))))
 
@@ -388,9 +388,6 @@
                pubkey-mismatch (and contact-id
                                     (get-in contacts [contact-id :public-key])
                                     (not= pubkey (get-in contacts [contact-id :public-key])))
-               sender-name (if-let [c (get contacts contact-id)]
-                             (:name c)
-                             (str "unknown-" (subs from-addr 0 8)))
                new-msg {:text text :from-me false
                         :id id :ts ts}]
            (if pubkey-mismatch
@@ -405,8 +402,7 @@
                   :messenger/save-contacts nil})
                {:db (-> db
                         (assoc-in [:messenger :contacts from-addr]
-                                  {:name sender-name
-                                   :address from-addr
+                                  {:address from-addr
                                    :public-key pubkey
                                    :messages [new-msg]
                                    :msg-index {id 0}})

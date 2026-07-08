@@ -45,5 +45,5 @@
  :messenger/sorted-contacts
  (fn [db _]
    (->> (get-in db [:messenger :contacts])
-        (sort-by (fn [[_ c]] (:name c)))
+        (sort-by (fn [[_ c]] (:address c)))
         (vec))))

@@ -125,7 +125,7 @@
     (is (not-any? #(= target %) (get-in @rdb/app-db [:yggstack :peers])))))
 
 (deftest test-messenger-add-contact
-  (let [contact {:name "Alice" :address "201:abcd::1"}]
+  (let [contact {:address "201:abcd::1"}]
     (rf/dispatch-sync [:messenger/add-contact contact])
     (let [contacts (get-in @rdb/app-db [:messenger :contacts])
           addr-index (get-in @rdb/app-db [:messenger :contact-addr-index])]
@@ -133,7 +133,7 @@
       (is (= (ffirst contacts) (get addr-index "201:abcd::1")))
       (let [[cid c] (first contacts)]
         (is (string? cid))
-        (is (= "Alice" (:name c)))
+        (is (not (contains? c :name)))
         (is (= "201:abcd::1" (:address c)))
         (is (= [] (:messages c)))
         (is (= {} (:msg-index c))))))
@@ -141,7 +141,7 @@
 
 (deftest test-messenger-set-current-contact
   (let [cid "test-contact-1"]
-    (reset! rdb/app-db (assoc-in app-db [:messenger :contacts cid] {:name "Bob"}))
+    (reset! rdb/app-db (assoc-in app-db [:messenger :contacts cid] {:address "201::1"}))
     (rf/dispatch-sync [:messenger/set-current-contact cid])
     (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))))
 
@@ -150,7 +150,7 @@
         address "201:abcd::2"
         db-with-contact (-> app-db
                             (assoc-in [:messenger :contacts cid]
-                                      {:name "Test" :address address
+                                      {:address address
                                        :messages []})
                             (assoc-in [:yggstack :address] "201:abcd::1")
                             (assoc-in [:yggstack :private-key] "privkey")
@@ -197,7 +197,7 @@
         address "201:abcd::2"
         db-with-failed (-> app-db
                            (assoc-in [:messenger :contacts cid]
-                                     {:name "Test" :address address
+                                     {:address address
                                       :messages [{:id msg-id :text "hi"
                                                   :from-me true :status :failed}]
                                       :msg-index {msg-id 0}})
@@ -216,12 +216,13 @@
       (is (= msg-id (:msg-id opts))))))
 
 (deftest test-messenger-restore-contacts
-  (let [contacts {"cid1" {:name "Alice" :address "201::1"}}]
+  (let [contacts {"cid1" {:address "201::1"}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
     (let [msngr (:messenger @rdb/app-db)
           alice (get-in msngr [:contacts "cid1"])]
       (is (contains? (:contacts msngr) "cid1"))
-      (is (= "Alice" (:name alice)))
+      (is (= "201::1" (:address alice)))
+      (is (not (contains? alice :name)))
       (is (= [] (:messages alice)) "messages should be initialized to empty vector")
       (is (= {} (:msg-index alice)) "msg-index should be initialized to empty map"))))
 
@@ -264,7 +265,7 @@
             sig2 (crypto/sign-message privkey data2-to-sign)
             db-with-contact (-> app-db
                                 (assoc-in [:messenger :contacts existing-cid]
-                                          {:name "Bob" :address address
+                                          {:address address
                                            :messages [{:text "prev"}]})
                                 (assoc-in [:messenger :contact-addr-index address]
                                           existing-cid))]

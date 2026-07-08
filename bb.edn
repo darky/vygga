@@ -9,7 +9,8 @@
                        :task (fmt/fix {:paths ["src/main"]})}
          check-unused-vars {:doc "Check for unused vars (dry-run)"
                             :requires ([carve.api :as carve])
-                            :task (carve/carve! {:paths ["src/main"] :dry-run true})}
+                            :task (carve/carve! {:paths ["src/main"]
+                                                 :dry-run true})}
          remove-unused-vars {:doc "Interactively remove unused vars"
                              :requires ([carve.api :as carve])
                              :task (carve/carve! {:paths ["src/main"]})}}}

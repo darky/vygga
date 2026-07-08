@@ -141,7 +141,7 @@
 
 ;; ---- Contact List Screen ----
 
-(defn contact-item-render [^js props contact-id {:keys [name address last-message]} t]
+(defn contact-item-render [^js props contact-id {:keys [address last-message]} t]
   (let [preview (if last-message (:text last-message) "")]
     [:> rn/TouchableOpacity
      {:key contact-id
@@ -155,22 +155,21 @@
                           :background-color (:accent t) :justify-content :center
                           :align-items :center :margin-right 12}}
       [:> rn/Text {:style {:color (:text-inverse t) :font-size 18 :font-weight :bold}}
-       (-> name .charAt (.toUpperCase))]]
+       (-> address .charAt (.toUpperCase))]]
      [:> rn/View {:style {:flex 1}}
-      [:> rn/Text {:style {:font-size 16 :font-weight :600 :color (:text-primary t)}} name]
+      [:> rn/Text {:style {:font-size 16 :font-weight :600 :color (:text-primary t)}}
+       address]
       (when (seq preview)
         [:> rn/Text {:style {:font-size 13 :color (:text-tertiary t) :margin-top 2}
-                     :number-of-lines 1} preview])]
-     [:> rn/Text {:style {:font-size 11 :color (:text-muted t)}} address]]))
+                     :number-of-lines 1} preview])]]))
 
-(defn contact-item [^js props contact-id {:keys [name address last-message]}]
+(defn contact-item [^js props contact-id {:keys [address last-message]}]
   (r/with-let [t (theme/use-theme)]
-    (contact-item-render props contact-id {:name name :address address :last-message last-message} t)))
+    (contact-item-render props contact-id {:address address :last-message last-message} t)))
 
 (defn contacts [props]
   (r/with-let [sorted-contacts (rf/subscribe [:messenger/sorted-contacts])
                *show-add (r/atom false)
-               *new-name (r/atom "")
                *new-addr (r/atom "")
                t (theme/use-theme)]
     [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
@@ -200,13 +199,6 @@
           "Add Contact"]
          [:> rn/TextInput {:style {:border-width 1 :border-color (:border-input-alt t)
                                    :border-radius 8 :padding 12 :font-size 15
-                                   :margin-bottom 12 :color (:text-primary t)}
-                           :placeholder "Display name"
-                           :placeholder-text-color (:text-tertiary t)
-                           :value @*new-name
-                           :on-change-text #(reset! *new-name %)}]
-         [:> rn/TextInput {:style {:border-width 1 :border-color (:border-input-alt t)
-                                   :border-radius 8 :padding 12 :font-size 15
                                    :margin-bottom 20 :color (:text-primary t)}
                            :placeholder "Yggdrasil IPv6 (e.g. 201:1234::1)"
                            :placeholder-text-color (:text-tertiary t)
@@ -220,11 +212,10 @@
           [:> rn/Pressable {:style {:background-color (:accent t) :padding-horizontal 20
                                     :padding-vertical 10 :border-radius 8}
                             :on-press (fn []
-                                        (let [name @*new-name addr @*new-addr]
-                                          (when (and (seq name) (seq addr))
+                                        (let [addr @*new-addr]
+                                          (when (seq addr)
                                             (rf/dispatch [:messenger/add-contact
-                                                          {:name name :address addr}]))
-                                          (reset! *new-name "")
+                                                          {:address addr}]))
                                           (reset! *new-addr "")
                                           (reset! *show-add false)))}
            [:> rn/Text {:style {:color (:text-inverse t) :font-weight :600}} "Add"]]]]])
@@ -276,8 +267,7 @@
                             :border-bottom-width 1 :border-bottom-color (:border t)
                             :flex-direction :row :align-items :center}}
         [:> rn/Text {:style {:font-size 17 :font-weight :600 :flex 1 :color (:text-primary t)}}
-         (or (:name c) "Unknown")]
-        [:> rn/Text {:style {:font-size 12 :color (:text-tertiary t)}} (:address c)]]
+         (or (:address c) "Unknown")]]
        (if (empty? msgs)
          [:> rn/View {:style {:flex 1 :padding 40 :align-items :center}}
           [:> rn/Text {:style {:font-size 15 :color (:empty-text t)}}

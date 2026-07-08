@@ -89,32 +89,21 @@
   (let [props #js {:navigation #js {:navigate (fn [])}}
         result (view/contact-item-render
                 props "c1"
-                {:name "Alice" :address "201::1" :last-message {:text "Hey!"}}
+                {:address "201::1" :last-message {:text "Hey!"}}
                 theme/light)]
-    (is (text-present? result "Alice"))
     (is (text-present? result "201::1"))
-    (is (text-present? result "A"))
+    (is (text-present? result "2"))
     (is (text-present? result "Hey!"))))
 
 (deftest test-contact-item-render-no-preview
   (let [props #js {:navigation #js {:navigate (fn [])}}
         result (view/contact-item-render
                 props "c2"
-                {:name "Bob" :address "201::2"}
+                {:address "201::2"}
                 theme/light)]
-    (is (text-present? result "Bob"))
     (is (text-present? result "201::2"))
-    (is (text-present? result "B"))
+    (is (text-present? result "2"))
     (is (not (text-present? result "Hey!")))))
-
-(deftest test-contact-item-render-empty-name
-  (let [props #js {:navigation #js {:navigate (fn [])}}
-        result (view/contact-item-render
-                props "c3"
-                {:name "" :address "201::3"}
-                theme/light)]
-    (is (text-present? result ""))
-    (is (text-present? result "201::3"))))
 
 ;; ---- Component smoke tests ----
 
@@ -162,18 +151,18 @@
     (is (not-any? #(= target %) (get-in @rdb/app-db [:yggstack :peers])))))
 
 (deftest test-contacts-add-contact
-  (rf/dispatch-sync [:messenger/add-contact {:name "Charlie" :address "201::3"}])
+  (rf/dispatch-sync [:messenger/add-contact {:address "201::3"}])
   (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
     (is (= 1 (count contacts)))
     (let [[cid c] (first contacts)]
-      (is (= "Charlie" (:name c)))
+      (is (not (contains? c :name)))
       (is (= "201::3" (:address c)))
       (is (string? cid)))))
 
 (deftest test-contacts-set-current
   (let [cid "my-contact"]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts cid]
-                                   {:name "Dave" :address "201::4"}))
+                                   {:address "201::4"}))
     (rf/dispatch-sync [:messenger/set-current-contact cid])
     (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))))
 
@@ -181,7 +170,7 @@
   (let [cid "test-contact"
         db-with-contact (-> app-db
                             (assoc-in [:messenger :contacts cid]
-                                      {:name "Test" :address "201::5" :messages []})
+                                      {:address "201::5" :messages []})
                             (assoc-in [:yggstack :address] "201::1")
                             (assoc-in [:yggstack :private-key] "privkey")
                             (assoc-in [:yggstack :public-key] "pubkey"))]

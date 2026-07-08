@@ -31,7 +31,7 @@
   (is (= "201::1234" @(rf/subscribe [:yggstack/address]))))
 
 (deftest test-messenger-contacts
-  (let [contacts {"c1" {:name "Alice"}}]
+  (let [contacts {"c1" {:address "201::1"}}]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts] contacts))
     (is (= contacts @(rf/subscribe [:messenger/contacts])))))
 

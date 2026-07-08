@@ -70,6 +70,8 @@ bb check-unused-vars
 bb remove-unused-vars
 ```
 
+To exclude a var from detection (e.g., a side-effect-only `defonce`), add its fully qualified name to `.carve/ignore`, one per line.
+
 Then format Clojure files with cljfmt via babashka:
 
 ```bash
