@@ -35,10 +35,6 @@
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts] contacts))
     (is (= contacts @(rf/subscribe [:messenger/contacts])))))
 
-(deftest test-messenger-server-running
-  (reset! rdb/app-db (assoc-in app-db [:messenger :server-running] true))
-  (is (= true @(rf/subscribe [:messenger/server-running]))))
-
 (deftest test-messenger-current-contact
   (reset! rdb/app-db (assoc-in app-db [:messenger :current-contact] "cid1"))
   (is (= "cid1" @(rf/subscribe [:messenger/current-contact]))))

@@ -32,11 +32,6 @@
    (get-in db [:messenger :contacts])))
 
 (rf/reg-sub
- :messenger/server-running
- (fn [db _]
-   (get-in db [:messenger :server-running])))
-
-(rf/reg-sub
  :messenger/current-contact
  (fn [db _]
    (get-in db [:messenger :current-contact])))
