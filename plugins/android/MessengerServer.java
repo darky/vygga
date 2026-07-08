@@ -27,15 +27,11 @@ public class MessengerServer {
   private static final Pattern EDN_FROM_PATTERN = Pattern.compile(":from\\s+\"((?:[^\"\\\\]|\\\\.)*)\"");
 
   public interface MessageListener {
-    void onMessage(String message);
+    void onNewMessage();
   }
 
   public static void addMessageListener(MessageListener l) {
     messageListeners.add(l);
-    while (!pendingMessages.isEmpty()) {
-      String msg = pendingMessages.remove(0);
-      if (msg != null) l.onMessage(msg);
-    }
   }
 
   public static void removeMessageListener(MessageListener l) {
@@ -72,7 +68,7 @@ public class MessengerServer {
                   showMessageNotification(context, msg);
                 }
                 for (MessageListener l : messageListeners) {
-                  l.onMessage(msg);
+                  l.onNewMessage();
                 }
               }
               client.close();

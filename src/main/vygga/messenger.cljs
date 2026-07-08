@@ -72,7 +72,8 @@
     (let [NativeEventEmitter (.-NativeEventEmitter rn)]
       (when NativeEventEmitter
         (let [emitter (NativeEventEmitter. native-module)
-              sub (.addListener emitter "onMessengerMessage" parse-and-dispatch)]
+              sub (.addListener emitter "onNewMessageAvailable"
+                                (fn [_] (poll-pending-messages!)))]
           (reset! listener-sub #(.remove sub))
           (poll-pending-messages!))))))
 

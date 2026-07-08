@@ -244,7 +244,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @Override
   public void onHostResume() {
     if (messageListener == null) {
-      messageListener = this::onMessengerMessage;
+      messageListener = this::onNewMessageAvailable;
       MessengerServer.addMessageListener(messageListener);
     }
     if (logListener == null) {
@@ -279,7 +279,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     }
   }
 
-  private void onMessengerMessage(String payload) {
-    sendEvent("onMessengerMessage", payload);
+  private void onNewMessageAvailable() {
+    sendEvent("onNewMessageAvailable", true);
   }
 }
