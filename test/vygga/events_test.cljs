@@ -176,6 +176,20 @@
         (is (= {} (:msg-index c))))))
   (is (contains? @captured :messenger/save-contacts)))
 
+(deftest test-messenger-add-contact-duplicate
+  (let [addr "201:abcd::1"]
+    (rf/dispatch-sync [:messenger/add-contact {:address addr}])
+    (let [contacts-after-first (get-in @rdb/app-db [:messenger :contacts])
+          first-cid (ffirst contacts-after-first)]
+      (is (= 1 (count contacts-after-first)))
+      (reset! captured {})
+      (rf/dispatch-sync [:messenger/add-contact {:address addr}])
+      (let [contacts (get-in @rdb/app-db [:messenger :contacts])
+            addr-index (get-in @rdb/app-db [:messenger :contact-addr-index])]
+        (is (= 1 (count contacts)) "duplicate add should not create a second contact")
+        (is (= first-cid (ffirst contacts)) "the contact should be unchanged")
+        (is (= first-cid (get addr-index addr)) "index should still point to the original cid")))))
+
 (deftest test-messenger-set-current-contact
   (let [cid "test-contact-1"]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts cid] {:address "201::1"}))
@@ -253,15 +267,34 @@
       (is (= msg-id (:msg-id opts))))))
 
 (deftest test-messenger-restore-contacts
-  (let [contacts {"cid1" {:address "201::1"}}]
+  (let [contacts {"cid1" {:address "201::1"} "cid2" {:address "201::2"}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
     (let [msngr (:messenger @rdb/app-db)
-          alice (get-in msngr [:contacts "cid1"])]
+          alice (get-in msngr [:contacts "cid1"])
+          bob (get-in msngr [:contacts "cid2"])
+          index (get-in msngr [:contact-addr-index])]
       (is (contains? (:contacts msngr) "cid1"))
       (is (= "201::1" (:address alice)))
       (is (not (contains? alice :name)))
       (is (= [] (:messages alice)) "messages should be initialized to empty vector")
-      (is (= {} (:msg-index alice)) "msg-index should be initialized to empty map"))))
+      (is (= {} (:msg-index alice)) "msg-index should be initialized to empty map")
+      (is (contains? (:contacts msngr) "cid2"))
+      (is (= "201::2" (:address bob)))
+      (is (= "cid1" (get index "201::1")) "contact-addr-index should map address to cid")
+      (is (= "cid2" (get index "201::2")) "contact-addr-index should map address to cid"))))
+
+(deftest test-messenger-restore-contacts-dedup
+  (let [contacts {"cid1" {:address "201::1"}
+                  "cid2" {:address "201::1"} ;; duplicate address
+                  "cid3" {:address "201::2"}}]
+    (rf/dispatch-sync [:messenger/restore-contacts contacts])
+    (let [msngr (:messenger @rdb/app-db)]
+      (is (= 2 (count (:contacts msngr))) "should keep only 1 contact per address")
+      (is (= "201::1" (:address (val (first (:contacts msngr))))))
+      (is (= "201::2" (:address (val (second (:contacts msngr))))))
+      (is (= 2 (count (get-in msngr [:contact-addr-index]))) "index should have 2 entries")
+      (is (get (get-in msngr [:contact-addr-index]) "201::1"))
+      (is (get (get-in msngr [:contact-addr-index]) "201::2")))))
 
 (deftest test-messenger-receive-incoming-unsigned
   (rf/dispatch-sync [:messenger/receive-incoming
