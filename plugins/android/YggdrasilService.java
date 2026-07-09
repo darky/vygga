@@ -8,13 +8,9 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.SystemClock;
-import android.util.Log;
-
 import androidx.annotation.Nullable;
 
 public class YggdrasilService extends Service {
-
-  private static final String TAG = "YggdrasilService";
 
   public static void startYggdrasil(Context context, String configJSON, String socksAddress, String nameserver) throws Exception {
     if (YggdrasilManager.isRunning()) return;
@@ -48,23 +44,6 @@ public class YggdrasilService extends Service {
         "Yggdrasil Messenger",
         YggdrasilManager.isRunning() ? "Listening for messages..." : "Reconnecting..."));
 
-    if (!YggdrasilManager.isRunning()) {
-      YggdrasilManager.restorePersistedConfig(this);
-      String config = YggdrasilManager.getLastConfigJSON();
-      if (config != null) {
-        try {
-          Log.i(TAG, "Auto-restarting yggdrasil from onStartCommand");
-          YggdrasilManager.start(this, config,
-            YggdrasilManager.getLastSocksAddress() != null
-              ? YggdrasilManager.getLastSocksAddress() : "127.0.0.1:1080",
-            YggdrasilManager.getLastNameserver() != null
-              ? YggdrasilManager.getLastNameserver() : "");
-        } catch (Exception e) {
-          Log.e(TAG, "Auto-restart yggdrasil failed", e);
-        }
-      }
-    }
-
     return START_STICKY;
   }
 
@@ -82,11 +61,6 @@ public class YggdrasilService extends Service {
 
   @Override
   public void onDestroy() {
-    if (YggdrasilManager.hasPersistedConfig(this)) {
-      stopForeground(false);
-      super.onDestroy();
-      return;
-    }
     YggdrasilManager.stopInternal();
     MessengerServer.stop();
     stopForeground(true);

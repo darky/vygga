@@ -49,7 +49,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
         getReactApplicationContext(), configJSON, socksAddress, nameserver);
       promise.resolve(true);
     } catch (Exception e) {
-      Log.e(TAG, "start error", e);
+      Log.e(TAG, "start error: " + e.getMessage());
       promise.reject("YGGSTACK_START_ERROR", e.getMessage(), e);
     }
   }

@@ -81,6 +81,7 @@ public class NotificationHelper {
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setAutoCancel(true)
       .setContentIntent(contentIntent)
+      .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
       .build();
     mgr.notify("vygga_messages", msgNotifId++, notification);
   }

@@ -1,7 +1,6 @@
 package expo.modules.yggstack;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -12,16 +11,9 @@ import link.yggdrasil.yggstack.mobile.Yggstack;
 public class YggdrasilManager {
 
   private static final String TAG = "YggdrasilManager";
-  private static final String PREFS_NAME = "yggdrasil_service_prefs";
-  private static final String PREF_CONFIG = "configJSON";
-  private static final String PREF_SOCKS = "socksAddress";
-  private static final String PREF_NS = "nameserver";
 
   private static Yggstack instance;
   private static boolean running = false;
-  private static String lastConfigJSON;
-  private static String lastSocksAddress;
-  private static String lastNameserver;
   private static Context appContext;
 
   private static final CopyOnWriteArrayList<LogListener> logListeners = new CopyOnWriteArrayList<>();
@@ -99,40 +91,6 @@ public class YggdrasilManager {
     }
   }
 
-  // ---- Config persistence ----
-
-  public static void persistConfig(Context context) {
-    if (lastConfigJSON == null) return;
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      .edit()
-      .putString(PREF_CONFIG, lastConfigJSON)
-      .putString(PREF_SOCKS, lastSocksAddress)
-      .putString(PREF_NS, lastNameserver)
-      .apply();
-  }
-
-  public static void clearPersistedConfig(Context context) {
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply();
-  }
-
-  public static boolean hasPersistedConfig(Context context) {
-    return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).contains(PREF_CONFIG);
-  }
-
-  public static void restorePersistedConfig(Context context) {
-    if (lastConfigJSON != null) return;
-    SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-    lastConfigJSON = prefs.getString(PREF_CONFIG, null);
-    lastSocksAddress = prefs.getString(PREF_SOCKS, null);
-    lastNameserver = prefs.getString(PREF_NS, null);
-  }
-
-  // ---- Getters for persisted config (used by Service auto-restart) ----
-
-  public static String getLastConfigJSON() { return lastConfigJSON; }
-  public static String getLastSocksAddress() { return lastSocksAddress; }
-  public static String getLastNameserver() { return lastNameserver; }
-
   // ---- Lifecycle ----
 
   private static void startInternal(String configJSON, String socksAddress, String nameserver) throws Exception {
@@ -147,10 +105,6 @@ public class YggdrasilManager {
 
   public static void start(Context context, String configJSON, String socksAddress, String nameserver) throws Exception {
     if (running) return;
-    lastConfigJSON = configJSON;
-    lastSocksAddress = socksAddress;
-    lastNameserver = nameserver;
-    persistConfig(context);
     startInternal(configJSON, socksAddress, nameserver);
   }
 
@@ -160,10 +114,6 @@ public class YggdrasilManager {
     }
     running = false;
     instance = null;
-    lastConfigJSON = null;
-    lastSocksAddress = null;
-    lastNameserver = null;
-    clearPersistedConfig(context);
     notifyStatusChange();
   }
 
