@@ -244,10 +244,14 @@
  :messenger/restore-contacts
  (fn [db [_ contacts]]
    (let [rekeyed (reduce-kv (fn [acc _ v]
-                              (assoc acc (:address v)
-                                     (merge {:messages []
-                                             :msg-index {}}
-                                            (select-keys v [:address :public-key]))))
+                              (let [msgs (vec (take-last 5 (:messages v)))
+                                    idx (reduce-kv (fn [m i msg]
+                                                     (assoc m (:id msg) i))
+                                                   {} msgs)]
+                                (assoc acc (:address v)
+                                       (merge {:messages msgs
+                                               :msg-index idx}
+                                              (select-keys v [:address :public-key])))))
                             {} contacts)]
      (assoc-in db [:messenger :contacts] rekeyed))))
 
@@ -256,7 +260,9 @@
  (fn [_]
    (let [contacts (get-in @rdb/app-db [:messenger :contacts])
          stripped (reduce-kv (fn [acc k v]
-                               (assoc acc k (dissoc v :messages :msg-index)))
+                               (assoc acc k
+                                      (-> (dissoc v :msg-index)
+                                          (update :messages #(vec (take-last 5 %))))))
                              {} contacts)]
      (-> (secure-store/setItemAsync "vygga_contacts" (pr-str stripped))
          (.catch (fn [e]
@@ -320,7 +326,8 @@
                                      :contact-id contact-id
                                      :text text
                                      :msg-id msg-id
-                                     :ts ts}})
+                                     :ts ts}
+          :messenger/save-contacts nil})
        (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx

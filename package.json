@@ -9,7 +9,6 @@
     "release": "npx shadow-cljs release app",
     "eject": "npx expo eject",
     "test": "npx shadow-cljs compile test && node --require ./test/support/preload.js out/test/test.js",
-    "test:quick": "node --require ./test/support/preload.js out/test/test.js",
     "eas-build-post-install": "npx shadow-cljs release app"
   },
   "dependencies": {

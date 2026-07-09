@@ -8,23 +8,7 @@ After each feature implementation or code change, run the test suite:
 npm test
 ```
 
-This compiles ClojureScript via shadow-cljs then runs the tests under Node.js.
-
-For a quicker re-run (skip the compile step), use:
-
-```bash
-npm run test:quick
-```
-
-For TDD workflow, keep shadow-cljs watch running in a separate terminal:
-
-```bash
-# Terminal 1 (stays running)
-npx shadow-cljs watch test
-
-# Terminal 2 (re-run as needed)
-npm run test:quick
-```
+This compiles ClojureScript via shadow-cljs then runs the tests under Node.js. Always use `npm test` — there is no skip-compile shortcut.
 
 ### Test files structure
 

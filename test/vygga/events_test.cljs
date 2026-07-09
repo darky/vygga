@@ -29,7 +29,6 @@
 (rf/reg-fx :messenger/stop-tcp-server (mock-fx :messenger/stop-tcp-server))
 (rf/reg-fx :messenger/send-via-socks (mock-fx :messenger/send-via-socks))
 (rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
-(rf/reg-fx :messenger/save-contacts (mock-fx :messenger/save-contacts))
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
@@ -171,8 +170,8 @@
       (is (not (contains? c :name)))
       (is (= addr (:address c)))
       (is (= [] (:messages c)))
-      (is (= {} (:msg-index c)))))
-  (is (contains? @captured :messenger/save-contacts)))
+      (is (= {} (:msg-index c)))
+      (is (= {:address addr :messages [] :msg-index {}} c)))))
 
 (deftest test-messenger-add-contact-duplicate
   (let [addr "201:abcd::1"]
@@ -260,7 +259,10 @@
       (is (= msg-id (:msg-id opts))))))
 
 (deftest test-messenger-restore-contacts
-  (let [contacts {"cid1" {:address "201::1"} "cid2" {:address "201::2"}}]
+  (let [contacts {"cid1" {:address "201::1"}
+                  "cid2" {:address "201::2"
+                          :messages [{:id "m1" :text "hi" :from-me true}
+                                     {:id "m2" :text "bye" :from-me false}]}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
     (let [msngr (:messenger @rdb/app-db)
           alice (get-in msngr [:contacts "201::1"])
@@ -269,12 +271,30 @@
       (is (contains? (:contacts msngr) "201::1"))
       (is (= "201::1" (:address alice)))
       (is (not (contains? alice :name)))
-      (is (= [] (:messages alice)) "messages should be initialized to empty vector")
-      (is (= {} (:msg-index alice)) "msg-index should be initialized to empty map")
+      (is (= [] (:messages alice)) "no persisted messages leaves empty vector")
+      (is (= {} (:msg-index alice)) "no persisted messages leaves empty index")
       (is (contains? (:contacts msngr) "201::2"))
       (is (= "201::2" (:address bob)))
+      (is (= 2 (count (:messages bob))) "persisted messages are restored")
+      (is (= "hi" (get-in (:messages bob) [0 :text])))
+      (is (= "bye" (get-in (:messages bob) [1 :text])))
+      (is (= 0 (get-in bob [:msg-index "m1"])) "msg-index is rebuilt from restored messages")
+      (is (= 1 (get-in bob [:msg-index "m2"])))
       (is (not (contains? (:contacts msngr) "cid1")) "old UUID key should be re-keyed to address")
       (is (not (contains? (:contacts msngr) "cid2")) "old UUID key should be re-keyed to address"))))
+
+(deftest test-messenger-restore-contacts-limit-to-5
+  (let [msgs (vec (for [i (range 7)]
+                    {:id (str "msg-" i) :text (str "msg " i) :from-me true}))
+        contacts {"cid1" {:address "201::1" :messages msgs}}]
+    (rf/dispatch-sync [:messenger/restore-contacts contacts])
+    (let [restored-msgs (get-in @rdb/app-db [:messenger :contacts "201::1" :messages])
+          idx (get-in @rdb/app-db [:messenger :contacts "201::1" :msg-index])]
+      (is (= 5 (count restored-msgs)) "only last 5 messages survive restore")
+      (is (= "msg 2" (get-in restored-msgs [0 :text])) "first restored is index 2 (3rd)")
+      (is (= "msg 6" (get-in restored-msgs [4 :text])) "last restored is index 6 (7th)")
+      (is (= 0 (get idx "msg-2")) "msg-index is rebuilt for restored messages")
+      (is (= 4 (get idx "msg-6"))))))
 
 (deftest test-messenger-restore-contacts-dedup
   (let [contacts {"cid1" {:address "201::1"}
@@ -313,8 +333,7 @@
         (is (= 1 (count contacts)))
         (is (some? contact))
         (is (= text (get-in contact [:messages 0 :text])))
-        (is (false? (get-in contact [:messages 0 :from-me]))))
-      (is (contains? @captured :messenger/save-contacts)))
+        (is (false? (get-in contact [:messages 0 :from-me])))))
     (testing "existing sender appends message"
       (let [address "201:bbbb::1"
             msg2-text "Second msg"
@@ -333,5 +352,4 @@
         (let [msgs (get-in @rdb/app-db [:messenger :contacts address :messages])]
           (is (= 2 (count msgs)))
           (is (= "Second msg" (:text (last msgs))))
-          (is (false? (:from-me (last msgs)))))
-        (is (contains? @captured :messenger/save-contacts))))))
+          (is (false? (:from-me (last msgs)))))))))
