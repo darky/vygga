@@ -332,8 +332,8 @@
                                       (when (and @*at-bottom @*flat-ref)
                                         (try (.scrollToEnd ^js @*flat-ref #js {:animated false})
                                              (catch js/Error _))))
-             :on-scroll (fn [^js e]
-                          (when-let [y (some-> e .-nativeEvent .-contentOffset .-y)]
+            :on-scroll (fn [^js e]
+                         (when-let [y (some-> e .-nativeEvent .-contentOffset .-y)]
                            (reset! *at-bottom (< y 50))))
             :initial-num-to-render 20
             :max-to-render-per-batch 20
