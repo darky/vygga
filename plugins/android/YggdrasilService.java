@@ -1,6 +1,9 @@
 package expo.modules.yggstack;
 
 import android.app.AlarmManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -8,9 +11,13 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.SystemClock;
+
 import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
 
 public class YggdrasilService extends Service {
+
+  private static final int FOREGROUND_NOTIFICATION_ID = 9001;
 
   public static void startYggdrasil(Context context, String configJSON, String socksAddress, String nameserver) throws Exception {
     if (YggdrasilManager.isRunning()) return;
@@ -33,17 +40,12 @@ public class YggdrasilService extends Service {
   public void onCreate() {
     super.onCreate();
     YggdrasilManager.setAppContext(getApplicationContext());
-    NotificationHelper.createChannels(this);
+    createServiceChannel();
   }
 
   @Override
   public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
-    startForeground(
-      NotificationHelper.getForegroundNotificationId(),
-      NotificationHelper.buildForeground(this,
-        "Yggdrasil Messenger",
-        YggdrasilManager.isRunning() ? "Listening for messages..." : "Reconnecting..."));
-
+    startForeground(FOREGROUND_NOTIFICATION_ID, buildForegroundNotification());
     return START_STICKY;
   }
 
@@ -71,5 +73,37 @@ public class YggdrasilService extends Service {
   @Override
   public IBinder onBind(Intent intent) {
     return null;
+  }
+
+  // ---- Foreground notification ----
+
+  private void createServiceChannel() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      NotificationChannel channel = new NotificationChannel(
+        "yggdrasil_service",
+        "Yggdrasil Service",
+        NotificationManager.IMPORTANCE_LOW
+      );
+      channel.setDescription("Keeps the app running to receive messages");
+      channel.setShowBadge(false);
+      NotificationManager mgr = getSystemService(NotificationManager.class);
+      if (mgr != null) mgr.createNotificationChannel(channel);
+    }
+  }
+
+  private Notification buildForegroundNotification() {
+    NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "yggdrasil_service")
+      .setContentTitle("Yggdrasil Messenger")
+      .setContentText(YggdrasilManager.isRunning() ? "Listening for messages..." : "Reconnecting...")
+      .setOngoing(true)
+      .setPriority(NotificationCompat.PRIORITY_LOW);
+    int icon = getIconId();
+    if (icon != 0) builder.setSmallIcon(icon);
+    return builder.build();
+  }
+
+  private int getIconId() {
+    int icon = getResources().getIdentifier("ic_launcher", "mipmap", getPackageName());
+    return icon != 0 ? icon : android.R.drawable.ic_dialog_info;
   }
 }

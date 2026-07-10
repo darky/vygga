@@ -14,6 +14,7 @@ var stubModules = {
   'react-native-safe-area-context': true,
   '@expo/vector-icons/Ionicons': true,
   'expo-clipboard': true,
+  'expo-notifications': true,
 };
 
 Module._resolveFilename = function(request, parent) {

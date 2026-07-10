@@ -8,7 +8,6 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
-import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 
@@ -159,7 +158,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @ReactMethod
   public void startMessengerServer(int port, Promise promise) {
     try {
-      MessengerServer.start(port, getReactApplicationContext());
+      MessengerServer.start(port);
       promise.resolve(true);
     } catch (Exception e) {
       Log.e(TAG, "Messenger server error", e);
@@ -178,20 +177,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @ReactMethod
   public void removeListeners(int count) {}
-
-  @ReactMethod
-  public void pollPendingMessages(Promise promise) {
-    try {
-      java.util.List<String> msgs = MessengerServer.pollPendingMessages();
-      WritableArray arr = Arguments.createArray();
-      for (String msg : msgs) {
-        arr.pushString(msg);
-      }
-      promise.resolve(arr);
-    } catch (Exception e) {
-      promise.resolve(Arguments.createArray());
-    }
-  }
 
   @ReactMethod
   public void sendMessage(String targetAddr, String message, Promise promise) {
@@ -244,7 +229,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   @Override
   public void onHostResume() {
     if (messageListener == null) {
-      messageListener = this::onNewMessageAvailable;
+      messageListener = this::onMessageReceived;
       MessengerServer.addMessageListener(messageListener);
     }
     if (logListener == null) {
@@ -258,7 +243,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     if (YggdrasilManager.isRunning()) {
       sendStatusEvent();
     }
-    onNewMessageAvailable();
   }
 
   @Override
@@ -280,7 +264,7 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     }
   }
 
-  private void onNewMessageAvailable() {
-    sendEvent("onNewMessageAvailable", true);
+  private void onMessageReceived(String msg) {
+    sendEvent("onIncomingMessage", msg);
   }
 }

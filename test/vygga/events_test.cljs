@@ -29,6 +29,7 @@
 (rf/reg-fx :messenger/stop-tcp-server (mock-fx :messenger/stop-tcp-server))
 (rf/reg-fx :messenger/send-via-socks (mock-fx :messenger/send-via-socks))
 (rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
+(rf/reg-fx :messenger/show-incoming-notification (mock-fx :messenger/show-incoming-notification))
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
@@ -326,6 +327,7 @@
         data-to-sign (str text "|" msg-id "|" ts)
         sig (crypto/sign-message privkey data-to-sign)]
     (testing "unknown sender creates new contact"
+      (reset! captured {})
       (rf/dispatch-sync [:messenger/receive-incoming
                          "201:aaaa::1" text msg-id ts pubkey sig])
       (let [contacts (get-in @rdb/app-db [:messenger :contacts])
@@ -333,7 +335,11 @@
         (is (= 1 (count contacts)))
         (is (some? contact))
         (is (= text (get-in contact [:messages 0 :text])))
-        (is (false? (get-in contact [:messages 0 :from-me])))))
+        (is (false? (get-in contact [:messages 0 :from-me]))))
+      (let [notif-opts (get @captured :messenger/show-incoming-notification)]
+        (is (map? notif-opts) "notification effect should fire for new contact")
+        (is (= "201:aaaa::1" (:from-addr notif-opts)))
+        (is (= "Hello from mesh!" (:text notif-opts)))))
     (testing "existing sender appends message"
       (let [address "201:bbbb::1"
             msg2-text "Second msg"
@@ -352,4 +358,8 @@
         (let [msgs (get-in @rdb/app-db [:messenger :contacts address :messages])]
           (is (= 2 (count msgs)))
           (is (= "Second msg" (:text (last msgs))))
-          (is (false? (:from-me (last msgs)))))))))
+          (is (false? (:from-me (last msgs)))))
+        (let [notif-opts (get @captured :messenger/show-incoming-notification)]
+          (is (map? notif-opts) "notification effect should fire for existing contact")
+          (is (= address (:from-addr notif-opts)))
+          (is (= msg2-text (:text notif-opts))))))))

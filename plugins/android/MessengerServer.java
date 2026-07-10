@@ -1,6 +1,5 @@
 package expo.modules.yggstack;
 
-import android.content.Context;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -8,10 +7,7 @@ import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class MessengerServer {
 
@@ -21,13 +17,9 @@ public class MessengerServer {
   private static Thread serverThread;
 
   private static final CopyOnWriteArrayList<MessageListener> messageListeners = new CopyOnWriteArrayList<>();
-  private static final CopyOnWriteArrayList<String> pendingMessages = new CopyOnWriteArrayList<>();
-
-  private static final Pattern EDN_TEXT_PATTERN = Pattern.compile(":text\\s+\"((?:[^\"\\\\]|\\\\.)*)\"");
-  private static final Pattern EDN_FROM_PATTERN = Pattern.compile(":from\\s+\"((?:[^\"\\\\]|\\\\.)*)\"");
 
   public interface MessageListener {
-    void onNewMessage();
+    void onNewMessage(String message);
   }
 
   public static void addMessageListener(MessageListener l) {
@@ -38,17 +30,11 @@ public class MessengerServer {
     messageListeners.remove(l);
   }
 
-  public static List<String> pollPendingMessages() {
-    List<String> batch = new java.util.ArrayList<>(pendingMessages);
-    pendingMessages.clear();
-    return batch;
-  }
-
   public static boolean isRunning() {
     return serverSocket != null && !serverSocket.isClosed();
   }
 
-  public static void start(int port, Context context) {
+  public static void start(int port) {
     if (serverSocket != null) return;
     serverThread = new Thread(() -> {
       try {
@@ -63,12 +49,8 @@ public class MessengerServer {
               String line;
               while ((line = reader.readLine()) != null) {
                 final String msg = line;
-                pendingMessages.add(msg);
-                if (context != null) {
-                  showMessageNotification(context, msg);
-                }
                 for (MessageListener l : messageListeners) {
-                  l.onNewMessage();
+                  l.onNewMessage(msg);
                 }
               }
               client.close();
@@ -90,20 +72,5 @@ public class MessengerServer {
     } catch (Exception ignored) {}
     serverSocket = null;
     serverThread = null;
-  }
-
-  // ---- EDN helpers ----
-
-  private static String extractQuoted(String raw, Pattern p) {
-    Matcher m = p.matcher(raw);
-    return m.find() ? m.group(1) : null;
-  }
-
-  private static void showMessageNotification(Context ctx, String raw) {
-    String text = extractQuoted(raw, EDN_TEXT_PATTERN);
-    String from = extractQuoted(raw, EDN_FROM_PATTERN);
-    if (text == null) return;
-    String sender = from != null && from.length() > 8 ? from.substring(0, 8) : "Unknown";
-    NotificationHelper.showMessageNotification(ctx, sender, text);
   }
 }

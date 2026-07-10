@@ -17,8 +17,7 @@
        :startMessengerServer    (fn [p] (swap! calls conj [:startMessengerServer p]) (js/Promise.resolve))
        :stopMessengerServer     (fn [] (swap! calls conj [:stopMessengerServer]) (js/Promise.resolve))
        :addRemoteTCPMapping     (fn [p addr] (swap! calls conj [:addRemoteTCPMapping p addr]) (js/Promise.resolve))
-       :removeRemoteTCPMapping  (fn [p addr] (swap! calls conj [:removeRemoteTCPMapping p addr]) (js/Promise.resolve))
-       :pollPendingMessages     (fn [] (swap! calls conj :pollPendingMessages) (js/Promise.resolve #js []))})
+       :removeRemoteTCPMapping  (fn [p addr] (swap! calls conj [:removeRemoteTCPMapping p addr]) (js/Promise.resolve))})
 
 (defn setup []
   (reset-calls!)
@@ -102,57 +101,59 @@
         sig (crypto/sign-message privkey data-to-sign)]
     (pr-str {:type "message" :from from-addr :text text :id id :ts ts :pubkey pubkey :sig sig})))
 
-;; Poll is async (native module promise chain). The re-frame dispatch
-;; inside parse-and-dispatch is also deferred via setTimeout. We use
-;; a 50ms timeout after the poll promise resolves to let the event
+;; receive-message! parses EDN synchronously and dispatches via
+;; re-frame. We use a 50ms timeout after the call to let the event
 ;; queue drain before making assertions.
 
-(deftest test-poll-pending-messages-dispatches-incoming
-  (let [msg-edn (make-signed-msg-edn "hello" "201::1" "m1" 100)
-        msgs-json #js [msg-edn]]
+(deftest test-receive-message-dispatches-incoming
+  (let [msg-edn (make-signed-msg-edn "hello" "201::1" "m1" 100)]
     (t/async done
-      (with-redefs [vygga.messenger/native-module
-                    #js {:pollPendingMessages (fn [] (js/Promise.resolve msgs-json))}]
-        (msg/poll-pending-messages!)
-        (js/setTimeout
-         (fn []
-           (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
-             (is (= 1 (count contacts)))
-             (is (= "hello" (get-in (val (first contacts)) [:messages 0 :text]))))
-           (done))
-         50)))))
+      (msg/receive-message! msg-edn)
+      (js/setTimeout
+       (fn []
+         (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
+           (is (= 1 (count contacts)))
+           (is (= "hello" (get-in (val (first contacts)) [:messages 0 :text]))))
+         (done))
+       50))))
 
-(deftest test-poll-pending-messages-invalid-edn
-  ;; Use an unknown tagged literal to trigger the :default handler in read-string
+(deftest test-receive-message-invalid-edn
   (let [warn-msgs (atom [])
-        msgs-json #js ["#unknown/tag \"data\""]
         orig-warn js/console.warn]
     (set! js/console.warn (fn [& args] (swap! warn-msgs conj (apply str args))))
-    (t/async done
-      (with-redefs [vygga.messenger/native-module
-                    #js {:pollPendingMessages (fn [] (js/Promise.resolve msgs-json))}]
-        (msg/poll-pending-messages!)
-        (js/setTimeout
-         (fn []
-           (set! js/console.warn orig-warn)
-           (is (= 1 (count @warn-msgs)))
-           (done))
-         50)))))
+    (msg/receive-message! "#unknown/tag \"data\"")
+    (set! js/console.warn orig-warn)
+    (is (= 1 (count @warn-msgs)) "malformed EDN should log a warning")))
 
-(deftest test-poll-pending-messages-multiple
+(deftest test-receive-message-multiple
   (let [msg1-edn (make-signed-msg-edn "a" "201::1" "m1" 100)
-        msg2-edn (make-signed-msg-edn "b" "201::2" "m2" 200)
-        msgs-json #js [msg1-edn msg2-edn]]
+        msg2-edn (make-signed-msg-edn "b" "201::2" "m2" 200)]
     (t/async done
-      (with-redefs [vygga.messenger/native-module
-                    #js {:pollPendingMessages (fn [] (js/Promise.resolve msgs-json))}]
-        (msg/poll-pending-messages!)
-        (js/setTimeout
-         (fn []
-           (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
-             (is (= 2 (count contacts))))
-           (done))
-         50)))))
+      (msg/receive-message! msg1-edn)
+      (msg/receive-message! msg2-edn)
+      (js/setTimeout
+       (fn []
+         (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
+           (is (= 2 (count contacts))))
+         (done))
+       50))))
+
+(deftest test-receive-message-ignores-non-message-type
+  (let [edn (pr-str {:type "presence" :from "201::1" :status "online"})]
+    (msg/receive-message! edn)
+    (is (empty? (get-in @rdb/app-db [:messenger :contacts]))
+        "non-message type should not create a contact")))
+
+(deftest test-receive-message-ignores-missing-from
+  (let [edn (pr-str {:type "message" :text "no from" :id "m1" :ts 1})]
+    (msg/receive-message! edn)
+    (is (empty? (get-in @rdb/app-db [:messenger :contacts]))
+        "message without :from should not create a contact")))
+
+(deftest test-install-listener-noop-when-no-native-module
+  (with-redefs [vygga.messenger/native-module nil]
+    (msg/install-message-listener!)
+    (is (nil? @vygga.messenger/listener-sub) "listener should remain nil when no native-module")))
 
 (deftest test-install-message-listener-sets-subscription
   (with-redefs [vygga.messenger/native-module (make-mock-module)]

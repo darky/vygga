@@ -8,6 +8,7 @@
    [vygga.messenger :as msg]
    [vygga.crypto :as crypto]
    [vygga.storage :as storage]
+   [vygga.notifications :as notif]
    [vygga.db :as db :refer [app-db]]))
 
 (rf/reg-event-db
@@ -18,8 +19,7 @@
 (rf/reg-event-fx
  :initialize-db
  (fn [_ _]
-   ;; Install listener early — native onHostResume may have already
-   ;; registered the Java-side listener, so JS needs to catch up
+   (notif/init!)
    (msg/install-message-listener!)
    {:db app-db
     :yggstack/load-and-start nil
@@ -268,6 +268,14 @@
          (.catch (fn [e]
                    (js/console.warn "Failed to save contacts:" e)))))))
 
+(rf/reg-fx
+ :messenger/show-incoming-notification
+ (fn [{:keys [from-addr text]}]
+   (let [sender (if (and from-addr (> (count from-addr) 8))
+                  (subs from-addr 0 8)
+                  "Unknown")]
+     (notif/show-message! sender text))))
+
 (rf/reg-event-fx
  :messenger/start-server
  (fn [{db :db} _]
@@ -410,11 +418,15 @@
                           (assoc-in [:messenger :contacts from-addr :messages] (conj msgs new-msg))
                           (assoc-in [:messenger :contacts from-addr :msg-index id] idx)
                           (assoc-in [:messenger :contacts from-addr :public-key] pubkey))
-                  :messenger/save-contacts nil})
+                  :messenger/save-contacts nil
+                  :messenger/show-incoming-notification {:from-addr from-addr
+                                                         :text text}})
                {:db (assoc-in db [:messenger :contacts from-addr]
                               {:address from-addr
                                :public-key pubkey
                                :messages [new-msg]
                                :msg-index {id 0}})
-                :messenger/save-contacts nil})))
+                :messenger/save-contacts nil
+                :messenger/show-incoming-notification {:from-addr from-addr
+                                                       :text text}})))
          (js/console.warn "Invalid signature from" from-addr))))))
