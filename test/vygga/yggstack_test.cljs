@@ -36,12 +36,11 @@
           parsed (js/JSON.parse config)
           peers (.-Peers parsed)]
       (is (= 0 (.-length peers)))))
-  (testing "listens on TCP any"
+  (testing "Listen section is empty (no incoming connections on mobile)"
     (let [config (ygg/build-config-json sample-private-key sample-peers)
           parsed (js/JSON.parse config)
           listen (.-Listen parsed)]
-      (is (= 1 (.-length listen)))
-      (is (= "tcp://[::]:0" (aget listen 0))))))
+      (is (= 0 (.-length listen))))))
 
 (def mod-calls (atom []))
 

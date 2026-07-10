@@ -1,6 +1,5 @@
 (ns vygga.yggstack
-  (:require [clojure.string :as str]
-            ["react-native-battery-optimization-check" :refer [RequestDisableOptimization]]
+  (:require ["react-native-battery-optimization-check" :refer [RequestDisableOptimization]]
             ["react-native" :as rn]))
 
 (defonce native-module
@@ -40,23 +39,19 @@
     (when parsed (.-PrivateKey parsed))))
 
 (defn build-config-json [private-key peers]
-  (let [peers-str (if (seq peers)
-                    (str "[" (str/join ", " (map #(str "\"" % "\"") peers)) "]")
-                    "[]")]
-    (str "{"
-         "\"PrivateKey\": \"" private-key "\","
-         "\"Certificate\": null,"
-         "\"Peers\": " peers-str ","
-         "\"InterfacePeers\": {},"
-         "\"Listen\": [\"tcp://[::]:0\"],"
-         "\"AdminListen\": \"none\","
-         "\"MulticastInterfaces\": [],"
-         "\"AllowedPublicKeys\": [],"
-         "\"IfName\": \"none\","
-         "\"IfMTU\": 65535,"
-         "\"NodeInfoPrivacy\": false,"
-         "\"NodeInfo\": null"
-         "}")))
+  (js/JSON.stringify
+   (clj->js {"PrivateKey"        private-key
+             "Certificate"       nil
+             "Peers"             (vec peers)
+             "InterfacePeers"    {}
+             "Listen"            []
+             "AdminListen"       "none"
+             "MulticastInterfaces" []
+             "AllowedPublicKeys" []
+             "IfName"            "none"
+             "IfMTU"             65535
+             "NodeInfoPrivacy"   false
+             "NodeInfo"          nil})))
 
 ;; ---- Foreground Service ----
 ;; Now backed by a real Android foreground service (YggdrasilService.java).
