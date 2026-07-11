@@ -302,11 +302,13 @@
 
 (rf/reg-fx
  :messenger/show-incoming-notification
- (fn [{:keys [from-addr text]}]
+ (fn [{:keys [from-addr text type]}]
    (let [sender (if (and from-addr (> (count from-addr) 8))
                   (subs from-addr 0 8)
                   "Unknown")]
-     (notif/show-message! sender text))))
+     (if (= :call type)
+       (notif/show-call! sender)
+       (notif/show-message! sender text)))))
 
 (rf/reg-event-fx
  :messenger/start-server
@@ -540,8 +542,9 @@
                       (assoc-in [:voip :remote-addr] from)
                       (assoc-in [:voip :started-at] ts)
                       (assoc-in [:voip :audio-seq] 0))
-              :messenger/show-incoming-notification {:from-addr from
-                                                     :text "Incoming call"}}
+               :messenger/show-incoming-notification {:from-addr from
+                                                      :text "Incoming call"
+                                                      :type :call}}
              (js/console.warn "Ignored call-offer: busy"))
 
            "accept"

@@ -2,6 +2,7 @@
   (:require ["expo-notifications" :as notifications]))
 
 (defonce ^:const channel-id "messages_channel")
+(defonce ^:const call-channel-id "calls_channel")
 
 (defn init! []
   (notifications/setNotificationHandler
@@ -15,7 +16,13 @@
                                                            :importance (.-HIGH ^js (.-AndroidImportance notifications))
                                                            :sound "music_marimba_chord"
                                                            :vibrationPattern [0 100 100 100]}))
-      (.catch (fn [e] (js/console.warn "notif channel error:" e)))))
+      (.catch (fn [e] (js/console.warn "notif channel error:" e))))
+  (-> (notifications/setNotificationChannelAsync call-channel-id
+                                                 (clj->js {:name "Calls"
+                                                           :importance (.-HIGH ^js (.-AndroidImportance notifications))
+                                                           :sound nil
+                                                           :vibrationPattern [0 100 100 100]}))
+      (.catch (fn [e] (js/console.warn "calls channel error:" e)))))
 
 (defn show-message! [sender text]
   (-> (notifications/scheduleNotificationAsync
@@ -24,3 +31,11 @@
                            :sound "music_marimba_chord"}
                  :trigger nil}))
       (.catch (fn [e] (js/console.warn "show notification error:" e)))))
+
+(defn show-call! [sender]
+  (-> (notifications/scheduleNotificationAsync
+       (clj->js {:content {:title (str "Incoming call from " sender)
+                           :body "Incoming call"
+                           :sound nil}
+                 :trigger nil}))
+      (.catch (fn [e] (js/console.warn "show call notification error:" e)))))
