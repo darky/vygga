@@ -58,9 +58,8 @@
       (is (map? signal))
       (is (= "offer" (:call-type signal)))
       (is (= address (:to signal))))
-    (let [audio-conn (get @captured :voip/connect-audio)]
-      (is (map? audio-conn))
-      (is (= address (:address audio-conn))))))
+    (is (not (contains? @captured :voip/connect-audio))
+        "should not connect audio before callee accepts")))
 
 (deftest test-call-contact-when-busy
   (let [contact-id "test-id"
@@ -91,7 +90,9 @@
     (let [signal (get @captured :voip/send-signal)]
       (is (map? signal))
       (is (= "accept" (:call-type signal))))
-    (is (contains? @captured :voip/start-capture))))
+    (is (contains? @captured :voip/start-capture))
+    (is (contains? @captured :voip/connect-audio)
+        "accepting call should connect audio for bidirectional communication")))
 
 (deftest test-accept-call-while-idle
   (rf/dispatch-sync [:voip/accept-call])

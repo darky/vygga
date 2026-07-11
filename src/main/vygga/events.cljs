@@ -451,15 +451,13 @@
                 (assoc-in [:voip :remote-addr] address)
                 (assoc-in [:voip :started-at] ts)
                 (assoc-in [:voip :audio-seq] 0))
-        :voip/send-signal {:call-type "offer"
-                           :call-id call-id
-                           :to address
-                           :from (or my-address "unknown")
-                           :ts ts
-                           :private-key private-key
-                           :public-key public-key}
-        :voip/connect-audio {:address address
-                             :call-id call-id}}
+         :voip/send-signal {:call-type "offer"
+                            :call-id call-id
+                            :to address
+                            :from (or my-address "unknown")
+                            :ts ts
+                            :private-key private-key
+                            :public-key public-key}}
        (js/console.warn "Cannot call: missing address, key, or already in call")))))
 
 (rf/reg-event-fx
@@ -470,15 +468,17 @@
          public-key (get-in db [:yggstack :public-key])
          my-address (get-in db [:yggstack :address])]
      (if (= :ringing (:call-state state))
-       {:db (assoc-in db [:voip :call-state] :connected)
-        :voip/send-signal {:call-type "accept"
-                           :call-id (:call-id state)
-                           :to (:remote-addr state)
-                           :from (or my-address "unknown")
-                           :ts (.now js/Date)
-                           :private-key private-key
-                           :public-key public-key}
-        :voip/start-capture nil}
+        {:db (assoc-in db [:voip :call-state] :connected)
+         :voip/send-signal {:call-type "accept"
+                            :call-id (:call-id state)
+                            :to (:remote-addr state)
+                            :from (or my-address "unknown")
+                            :ts (.now js/Date)
+                            :private-key private-key
+                            :public-key public-key}
+         :voip/start-capture nil
+         :voip/connect-audio {:address (:remote-addr state)
+                              :call-id (:call-id state)}}
        (js/console.warn "Cannot accept: not in ringing state")))))
 
 (rf/reg-event-fx
