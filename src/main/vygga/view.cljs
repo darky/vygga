@@ -449,7 +449,6 @@
                                 :status status :cid cid}])))}])
         [message-input cid]
         [:> StatusBar {:style "auto"}]
-        [active-call-bar {:t t}]
         [incoming-call-overlay {:t t}]]])))
 
 (defn root []
@@ -477,7 +476,9 @@
        [:> Stack.Screen {:name "Settings"
                          :component (fn [props] (r/as-element [settings props]))
                          :options {:title "Yggdrasil Settings"}}]]]
-     [incoming-call-overlay {:t t}]]))
+     [incoming-call-overlay {:t t}]
+     [:> rn/View {:style {:position :absolute :left 0 :right 0 :bottom 0 :z-index 50}}
+      [active-call-bar {:t t}]]]))
 
 
 

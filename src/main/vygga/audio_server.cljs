@@ -75,8 +75,8 @@
 (defn stop! []
   (js/Promise.
    (fn [resolve reject]
-      (when-let [^js conn @current-connection]
-        (try (.destroy conn) (catch js/Error _))
+     (when-let [^js conn @current-connection]
+       (try (.destroy conn) (catch js/Error _))
        (reset! current-connection nil))
      (if-let [server @server-instance]
        (.close server
