@@ -16,6 +16,16 @@
 
 (defonce Stack (rnn-stack/createNativeStackNavigator))
 
+;; React function component wrapper that calls useSafeAreaInsets directly
+;; (hooks work here because it's a plain React function component, not a Reagent component).
+;; Passes insets to a render-prop child.
+(def with-safe-area-insets
+  (let [f (fn [props]
+            (let [insets (useSafeAreaInsets)]
+              (r/as-element [(.-children props) insets])))]
+    (set! (.-displayName f) "withSafeAreaInsets")
+    (r/adapt-react-class f)))
+
 (defn status-label [status t]
   (case status
     :running [(:success t) "Connected"]
@@ -322,36 +332,37 @@
          [:> Ionicons {:name "call-outline" :size 22 :color (:call-accept t)}]]))))
 
 (defn active-call-bar [{_t :t}]
-  (let [call (rf/subscribe [:voip/active-call])
-        insets (useSafeAreaInsets)]
+  (let [call (rf/subscribe [:voip/active-call])]
     (fn [{:keys [t]}]
       (when-let [c @call]
         (let [state (:call-state c)
               addr (:remote-addr c)]
-          [:> rn/View {:style {:flex-direction :row :align-items :center
-                               :justify-content :space-between
-                               :padding-horizontal 16 :padding-vertical 8
-                               :padding-bottom (+ 8 (.-bottom insets))
-                               :background-color (:call-bg t)
-                               :border-bottom-width 1
-                               :border-bottom-color (:border t)}}
-           [:> rn/View {:style {:flex-direction :row :align-items :center}}
-            [:> rn/View {:style {:width 10 :height 10 :border-radius 5
-                                 :background-color (:call-accept t) :margin-right 8}}]
-            [:> rn/Text {:style {:font-size 14 :color (:call-accept t) :font-weight :600}}
-             (case state
-               :calling "Calling..."
-               :ringing "Incoming call..."
-               :connected "Call connected"
-               "Call")]]
-           [:> rn/View {:style {:flex-direction :row :align-items :center}}
-            [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t) :margin-right 8}}
-             (subs addr 0 8)]
-            [:> rn/TouchableOpacity {:on-press #(rf/dispatch [:voip/end-call])
-                                     :style {:background-color (:call-reject t)
-                                             :padding-horizontal 12 :padding-vertical 4
-                                             :border-radius 12}}
-             [:> rn/Text {:style {:color :white :font-size 12 :font-weight :600}} "End"]]]])))))
+          [with-safe-area-insets
+           (fn [insets]
+             [:> rn/View {:style {:flex-direction :row :align-items :center
+                                  :justify-content :space-between
+                                  :padding-horizontal 16 :padding-vertical 8
+                                  :padding-bottom (+ 8 (.-bottom insets))
+                                  :background-color (:call-bg t)
+                                  :border-bottom-width 1
+                                  :border-bottom-color (:border t)}}
+              [:> rn/View {:style {:flex-direction :row :align-items :center}}
+               [:> rn/View {:style {:width 10 :height 10 :border-radius 5
+                                    :background-color (:call-accept t) :margin-right 8}}]
+               [:> rn/Text {:style {:font-size 14 :color (:call-accept t) :font-weight :600}}
+                (case state
+                  :calling "Calling..."
+                  :ringing "Incoming call..."
+                  :connected "Call connected"
+                  "Call")]]
+              [:> rn/View {:style {:flex-direction :row :align-items :center}}
+               [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t) :margin-right 8}}
+                (subs addr 0 8)]
+               [:> rn/TouchableOpacity {:on-press #(rf/dispatch [:voip/end-call])
+                                        :style {:background-color (:call-reject t)
+                                                :padding-horizontal 12 :padding-vertical 4
+                                                :border-radius 12}}
+                [:> rn/Text {:style {:color :white :font-size 12 :font-weight :600}} "End"]]]])])))))
 
 (defn incoming-call-overlay [{_t :t}]
   (let [call (rf/subscribe [:voip/active-call])]
@@ -467,3 +478,6 @@
                          :component (fn [props] (r/as-element [settings props]))
                          :options {:title "Yggdrasil Settings"}}]]]
      [incoming-call-overlay {:t t}]]))
+
+
+
