@@ -13,7 +13,7 @@
    .  *  .  .  .  .  .  .  .  .  .  .  .  *  .  .
 ```
 
-# Vygga — Decentralized P2P Messenger over Yggdrasil
+# Vygga — Decentralized P2P Messenger / VoIP over Yggdrasil
 
 > **⚠️ Alpha / Experimental** — Vygga is in early development and alpha testing. Features may be incomplete, unstable, or change significantly. Use at your own risk.
 
