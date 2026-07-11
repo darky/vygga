@@ -25,7 +25,7 @@
       (if @server-instance
         (reject (js/Error. "Server already running"))
         (let [server (.createServer tcp
-                                    (fn [socket]
+                                    (fn [^js socket]
                                       (let [buf (atom "")]
                                         (.setEncoding socket "utf-8")
                                         (.on socket "data"
