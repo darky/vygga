@@ -46,4 +46,7 @@
  (fn [db _]
    (->> (get-in db [:messenger :contacts])
         (sort-by (fn [[_ c]] (:address c)))
-        (vec))))
+        (mapv (fn [[cid c]]
+                [cid (assoc c
+                            :last-message (last (:messages c))
+                            :unread-count (or (:unread-count c) 0))])))))

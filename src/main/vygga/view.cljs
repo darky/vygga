@@ -152,7 +152,7 @@
 
 ;; ---- Contact List Screen ----
 
-(defn contact-item-render [^js props contact-id {:keys [address last-message]} t]
+(defn contact-item-render [^js props contact-id {:keys [address last-message unread-count]} t]
   (let [preview (if last-message (:text last-message) "")]
     [:> rn/TouchableOpacity
      {:key contact-id
@@ -166,7 +166,15 @@
                           :background-color (:accent t) :justify-content :center
                           :align-items :center :margin-right 12}}
       [:> rn/Text {:style {:color (:text-inverse t) :font-size 18 :font-weight :bold}}
-       (-> address .charAt (.toUpperCase))]]
+       (-> address .charAt (.toUpperCase))]
+      (when (and unread-count (pos? unread-count))
+        [:> rn/View {:style {:position :absolute :top -4 :right -4
+                             :min-width 20 :height 20 :border-radius 10
+                             :background-color (:error t)
+                             :justify-content :center :align-items :center
+                             :padding-horizontal 4 :z-index 1}}
+         [:> rn/Text {:style {:color :white :font-size 11 :font-weight :bold}}
+          (if (> unread-count 99) "99+" (str unread-count))]])]
      [:> rn/View {:style {:flex 1}}
       [:> rn/Text {:style {:font-size 16 :font-weight :600 :color (:text-primary t)}}
        address]
@@ -174,10 +182,10 @@
         [:> rn/Text {:style {:font-size 13 :color (:text-tertiary t) :margin-top 2}
                      :number-of-lines 1} preview])]]))
 
-(defn contact-item [^js props contact-id {:keys [address last-message]}]
+(defn contact-item [^js props contact-id {:keys [address last-message unread-count]}]
   (r/with-let [pref (rf/subscribe [:theme/preferred-scheme])
                t (theme/use-theme @pref)]
-    (contact-item-render props contact-id {:address address :last-message last-message} t)))
+    (contact-item-render props contact-id {:address address :last-message last-message :unread-count unread-count} t)))
 
 (defn contacts [props]
   (r/with-let [sorted-contacts (rf/subscribe [:messenger/sorted-contacts])

@@ -33,6 +33,10 @@
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
+(defn- byte->hex [b]
+  (let [s (.toString b 16)]
+    (if (= 1 (.-length s)) (str "0" s) s)))
+
 (deftest test-initialize-db
   (rf/dispatch-sync [:initialize-db])
   (is (= app-db @rdb/app-db))
@@ -172,7 +176,7 @@
       (is (= addr (:address c)))
       (is (= [] (:messages c)))
       (is (= {} (:msg-index c)))
-      (is (= {:address addr :messages [] :msg-index {}} c)))))
+      (is (= {:address addr :messages [] :msg-index {} :unread-count 0} c)))))
 
 (deftest test-messenger-add-contact-duplicate
   (let [addr "201:abcd::1"]
@@ -184,10 +188,14 @@
       (is (contains? contacts addr) "contact should be keyed by address"))))
 
 (deftest test-messenger-set-current-contact
-  (let [cid "test-contact-1"]
-    (reset! rdb/app-db (assoc-in app-db [:messenger :contacts cid] {:address "201::1"}))
+  (let [cid "test-contact-1"
+        db-with-unread (assoc-in app-db
+                                 [:messenger :contacts cid]
+                                 {:address "201::1" :unread-count 3})]
+    (reset! rdb/app-db db-with-unread)
     (rf/dispatch-sync [:messenger/set-current-contact cid])
-    (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))))
+    (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))
+    (is (= 0 (get-in @rdb/app-db [:messenger :contacts cid :unread-count])))))
 
 (deftest test-messenger-send-message
   (let [cid "test-contact"
@@ -259,11 +267,39 @@
       (is (= "hi" (:text opts)))
       (is (= msg-id (:msg-id opts))))))
 
+(deftest test-messenger-receive-incoming-unread-viewing
+  (let [seed (doto (js/Uint8Array. 32) (aset 0 99))
+        kp (.. js/tweetnacl -sign -keyPair (fromSeed seed))
+        pubkey (apply str (map byte->hex (array-seq (.-publicKey kp))))
+        privkey (apply str (map byte->hex (array-seq (.-secretKey kp))))
+        address "201:cccc::1"
+        text "viewing test"
+        msg-id "view-msg-1"
+        ts 7000
+        data-to-sign (str text "|" msg-id "|" ts)
+        sig (crypto/sign-message privkey data-to-sign)
+        db-with-contact (-> app-db
+                            (assoc-in [:messenger :contacts address]
+                                      {:address address
+                                       :messages [{:text "earlier"}]
+                                       :msg-index {"earlier-id" 0}
+                                       :unread-count 0})
+                            (assoc-in [:messenger :current-contact] address))]
+    (reset! rdb/app-db db-with-contact)
+    (reset! captured {})
+    (rf/dispatch-sync [:messenger/receive-incoming
+                       address text msg-id ts pubkey sig])
+    (let [msgs (get-in @rdb/app-db [:messenger :contacts address :messages])]
+      (is (= 2 (count msgs)) "message is appended when viewing"))
+    (let [contact (get-in @rdb/app-db [:messenger :contacts address])]
+      (is (= 0 (:unread-count contact)) "unread stays 0 when viewing the contact"))))
+
 (deftest test-messenger-restore-contacts
   (let [contacts {"cid1" {:address "201::1"}
                   "cid2" {:address "201::2"
                           :messages [{:id "m1" :text "hi" :from-me true}
-                                     {:id "m2" :text "bye" :from-me false}]}}]
+                                     {:id "m2" :text "bye" :from-me false}]
+                          :unread-count 3}}]
     (rf/dispatch-sync [:messenger/restore-contacts contacts])
     (let [msngr (:messenger @rdb/app-db)
           alice (get-in msngr [:contacts "201::1"])
@@ -274,6 +310,7 @@
       (is (not (contains? alice :name)))
       (is (= [] (:messages alice)) "no persisted messages leaves empty vector")
       (is (= {} (:msg-index alice)) "no persisted messages leaves empty index")
+      (is (= 0 (:unread-count alice)) "no persisted unread-count defaults to 0")
       (is (contains? (:contacts msngr) "201::2"))
       (is (= "201::2" (:address bob)))
       (is (= 2 (count (:messages bob))) "persisted messages are restored")
@@ -281,6 +318,7 @@
       (is (= "bye" (get-in (:messages bob) [1 :text])))
       (is (= 0 (get-in bob [:msg-index "m1"])) "msg-index is rebuilt from restored messages")
       (is (= 1 (get-in bob [:msg-index "m2"])))
+      (is (= 3 (:unread-count bob)) "unread-count is preserved from persisted data")
       (is (not (contains? (:contacts msngr) "cid1")) "old UUID key should be re-keyed to address")
       (is (not (contains? (:contacts msngr) "cid2")) "old UUID key should be re-keyed to address"))))
 
@@ -312,10 +350,6 @@
                      "201::1" "hi" "new-id" 100 nil nil])
   (is (empty? (get-in @rdb/app-db [:messenger :contacts]))))
 
-(defn- byte->hex [b]
-  (let [s (.toString b 16)]
-    (if (= 1 (.-length s)) (str "0" s) s)))
-
 (deftest test-messenger-receive-incoming-valid
   (let [seed (doto (js/Uint8Array. 32) (aset 0 42))
         kp (.. js/tweetnacl -sign -keyPair (fromSeed seed))
@@ -335,7 +369,8 @@
         (is (= 1 (count contacts)))
         (is (some? contact))
         (is (= text (get-in contact [:messages 0 :text])))
-        (is (false? (get-in contact [:messages 0 :from-me]))))
+        (is (false? (get-in contact [:messages 0 :from-me])))
+        (is (= 1 (:unread-count contact)) "new contact from incoming starts at unread-count 1"))
       (let [notif-opts (get @captured :messenger/show-incoming-notification)]
         (is (map? notif-opts) "notification effect should fire for new contact")
         (is (= "201:aaaa::1" (:from-addr notif-opts)))
@@ -347,19 +382,22 @@
             msg2-ts 6000
             data2-to-sign (str msg2-text "|" msg2-id "|" msg2-ts)
             sig2 (crypto/sign-message privkey data2-to-sign)
-            db-with-contact (assoc-in app-db
-                                      [:messenger :contacts address]
-                                      {:address address
-                                       :messages [{:text "prev"}]})]
-        (reset! rdb/app-db db-with-contact)
-        (reset! captured {})
-        (rf/dispatch-sync [:messenger/receive-incoming
-                           address msg2-text msg2-id msg2-ts pubkey sig2])
-        (let [msgs (get-in @rdb/app-db [:messenger :contacts address :messages])]
-          (is (= 2 (count msgs)))
-          (is (= "Second msg" (:text (last msgs))))
-          (is (false? (:from-me (last msgs)))))
-        (let [notif-opts (get @captured :messenger/show-incoming-notification)]
+        db-with-contact (assoc-in app-db
+                                  [:messenger :contacts address]
+                                  {:address address
+                                   :messages [{:text "prev"}]
+                                   :unread-count 2})]
+    (reset! rdb/app-db db-with-contact)
+    (reset! captured {})
+    (rf/dispatch-sync [:messenger/receive-incoming
+                       address msg2-text msg2-id msg2-ts pubkey sig2])
+    (let [msgs (get-in @rdb/app-db [:messenger :contacts address :messages])]
+      (is (= 2 (count msgs)))
+      (is (= "Second msg" (:text (last msgs))))
+      (is (false? (:from-me (last msgs)))))
+    (let [contact (get-in @rdb/app-db [:messenger :contacts address])]
+      (is (= 3 (:unread-count contact)) "unread-count incremented from 2 to 3"))
+    (let [notif-opts (get @captured :messenger/show-incoming-notification)]
           (is (map? notif-opts) "notification effect should fire for existing contact")
           (is (= address (:from-addr notif-opts)))
           (is (= msg2-text (:text notif-opts))))))))

@@ -40,13 +40,20 @@
   (is (= "cid1" @(rf/subscribe [:messenger/current-contact]))))
 
 (deftest test-messenger-sorted-contacts
-  (let [contacts {"b" {:address "201::b"}
-                  "a" {:address "201::a"}
-                  "c" {:address "201::c"}}]
+  (let [contacts {"b" {:address "201::b" :messages []}
+                  "a" {:address "201::a" :messages [{:id "m1" :text "hello" :from-me true}]}
+                  "c" {:address "201::c" :messages [] :unread-count 5}}]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts] contacts))
     (let [sorted @(rf/subscribe [:messenger/sorted-contacts])]
       (is (= 3 (count sorted)))
       (is (= "a" (first (first sorted))))
       (is (= "201::c" (:address (second (last sorted)))))
       (is (= ["201::a" "201::b" "201::c"]
-             (map (fn [[_ c]] (:address c)) sorted))))))
+             (map (fn [[_ c]] (:address c)) sorted)))
+      (let [[_ a] (first sorted)
+            [_ b] (second sorted)
+            [_ c] (last sorted)]
+        (is (= "hello" (:text (:last-message a))) "last-message from messages")
+        (is (nil? (:last-message b)) "no last-message when messages empty")
+        (is (= 5 (:unread-count c)) "preserves explicit unread-count")
+        (is (= 0 (:unread-count a)) "defaults to 0 when unread-count missing")))))

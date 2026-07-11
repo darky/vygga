@@ -221,13 +221,16 @@
      {:db db}
      {:db (assoc-in db [:messenger :contacts address]
                     {:address address
-                     :messages [] :msg-index {}})
+                     :messages [] :msg-index {}
+                     :unread-count 0})
       :messenger/save-contacts nil})))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :messenger/set-current-contact
- (fn [{db :db} [_ id]]
-   {:db (assoc-in db [:messenger :current-contact] id)}))
+ (fn [db [_ id]]
+   (-> db
+       (assoc-in [:messenger :current-contact] id)
+       (assoc-in [:messenger :contacts id :unread-count] 0))))
 
 (rf/reg-fx
  :messenger/load-contacts
@@ -243,16 +246,18 @@
 (rf/reg-event-db
  :messenger/restore-contacts
  (fn [db [_ contacts]]
-   (let [rekeyed (reduce-kv (fn [acc _ v]
-                              (let [msgs (vec (take-last 5 (:messages v)))
-                                    idx (reduce-kv (fn [m i msg]
-                                                     (assoc m (:id msg) i))
-                                                   {} msgs)]
-                                (assoc acc (:address v)
-                                       (merge {:messages msgs
-                                               :msg-index idx}
-                                              (select-keys v [:address :public-key])))))
-                            {} contacts)]
+   (let [rekeyed (reduce-kv
+                  (fn [acc _ v]
+                    (let [msgs (vec (take-last 5 (:messages v)))
+                          idx (reduce-kv (fn [m i msg]
+                                           (assoc m (:id msg) i))
+                                         {} msgs)]
+                      (assoc acc (:address v)
+                             (merge {:messages msgs
+                                     :msg-index idx
+                                     :unread-count 0}
+                                    (select-keys v [:address :public-key :unread-count])))))
+                  {} contacts)]
      (assoc-in db [:messenger :contacts] rekeyed))))
 
 (rf/reg-fx
@@ -404,6 +409,7 @@
        (if (crypto/verify-signature pubkey data-to-verify sig)
          (let [contacts (get-in db [:messenger :contacts])
                existing (get contacts from-addr)
+               current-contact (get-in db [:messenger :current-contact])
                pubkey-mismatch (and existing
                                     (:public-key existing)
                                     (not= pubkey (:public-key existing)))
@@ -413,11 +419,14 @@
              (js/console.warn "Public key mismatch for" from-addr)
              (if existing
                (let [msgs (or (:messages existing) [])
-                     idx (count msgs)]
-                 {:db (-> db
-                          (assoc-in [:messenger :contacts from-addr :messages] (conj msgs new-msg))
-                          (assoc-in [:messenger :contacts from-addr :msg-index id] idx)
-                          (assoc-in [:messenger :contacts from-addr :public-key] pubkey))
+                     idx (count msgs)
+                     viewing? (= from-addr current-contact)]
+                 {:db (cond-> (-> db
+                                  (assoc-in [:messenger :contacts from-addr :messages] (conj msgs new-msg))
+                                  (assoc-in [:messenger :contacts from-addr :msg-index id] idx)
+                                  (assoc-in [:messenger :contacts from-addr :public-key] pubkey))
+                        (not viewing?)
+                        (update-in [:messenger :contacts from-addr :unread-count] (fnil inc 0)))
                   :messenger/save-contacts nil
                   :messenger/show-incoming-notification {:from-addr from-addr
                                                          :text text}})
@@ -425,7 +434,8 @@
                               {:address from-addr
                                :public-key pubkey
                                :messages [new-msg]
-                               :msg-index {id 0}})
+                               :msg-index {id 0}
+                               :unread-count 1})
                 :messenger/save-contacts nil
                 :messenger/show-incoming-notification {:from-addr from-addr
                                                        :text text}})))

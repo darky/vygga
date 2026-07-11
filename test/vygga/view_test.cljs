@@ -105,6 +105,48 @@
     (is (text-present? result "2"))
     (is (not (text-present? result "Hey!")))))
 
+(deftest test-contact-item-render-with-unread
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (view/contact-item-render
+                props "c3"
+                {:address "201::3" :unread-count 5}
+                theme/light)]
+    (is (text-present? result "201::3"))
+    (is (text-present? result "5"))))
+
+(deftest test-contact-item-render-unread-99plus
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (view/contact-item-render
+                props "c4"
+                {:address "201::4" :unread-count 100}
+                theme/light)]
+    (is (text-present? result "99+")))
+
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (view/contact-item-render
+                props "c5"
+                {:address "201::5" :unread-count 999}
+                theme/light)]
+    (is (text-present? result "99+"))))
+
+(deftest test-contact-item-render-no-unread-when-zero
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (view/contact-item-render
+                props "c6"
+                {:address "201::6" :unread-count 0}
+                theme/light)]
+    (is (text-present? result "201::6"))
+    (is (not (text-present? result "0")))))
+
+(deftest test-contact-item-render-no-unread-when-missing
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (view/contact-item-render
+                props "c7"
+                {:address "201::7"}
+                theme/light)]
+    (is (text-present? result "201::7"))
+    (is (not (text-present? result "0")))))
+
 ;; ---- Component smoke tests ----
 
 (deftest test-status-indicator-smoke
