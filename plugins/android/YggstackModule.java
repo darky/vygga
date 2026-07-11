@@ -89,6 +89,16 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   }
 
   @ReactMethod
+  public void retryPeersNow(Promise promise) {
+    try {
+      YggdrasilManager.retryPeersNow();
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_RETRY_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
   public void getPeers(Promise promise) {
     try {
       promise.resolve(YggdrasilManager.getPeers());

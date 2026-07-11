@@ -22,6 +22,10 @@
   (check-module)
   (.stop native-module))
 
+(defn retry-peers-now []
+  (check-module)
+  (.retryPeersNow native-module))
+
 (defn get-peers []
   (check-module)
   (.getPeersJSON native-module))

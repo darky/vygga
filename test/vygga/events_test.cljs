@@ -21,6 +21,8 @@
 (rf/reg-fx :yggstack/load-and-start (mock-fx :yggstack/load-and-start))
 (rf/reg-fx :yggstack/regenerate-identity (mock-fx :yggstack/regenerate-identity))
 (rf/reg-fx :yggstack/stop-daemon (mock-fx :yggstack/stop-daemon))
+(rf/reg-fx :yggstack/retry-peers-now (mock-fx :yggstack/retry-peers-now))
+(rf/reg-fx :yggstack/refresh-peer-count (mock-fx :yggstack/refresh-peer-count))
 (rf/reg-fx :yggstack/start-foreground-service (mock-fx :yggstack/start-foreground-service))
 (rf/reg-fx :yggstack/stop-foreground-service (mock-fx :yggstack/stop-foreground-service))
 (rf/reg-fx :yggstack/battery-opt-out-fx (mock-fx :yggstack/battery-opt-out-fx))
@@ -105,6 +107,20 @@
   (rf/dispatch-sync [:yggstack/stop])
   (is (= :stopping (get-in @rdb/app-db [:yggstack :status])))
   (is (contains? @captured :yggstack/stop-daemon)))
+
+(deftest test-yggstack-on-network-restored-when-running
+  (reset! rdb/app-db (assoc-in app-db [:yggstack :status] :running))
+  (reset! captured {})
+  (rf/dispatch-sync [:yggstack/on-network-restored])
+  (is (contains? @captured :yggstack/retry-peers-now))
+  (is (contains? @captured :yggstack/refresh-peer-count)))
+
+(deftest test-yggstack-on-network-restored-when-stopped
+  (reset! rdb/app-db (assoc-in app-db [:yggstack :status] :stopped))
+  (reset! captured {})
+  (rf/dispatch-sync [:yggstack/on-network-restored])
+  (is (not (contains? @captured :yggstack/retry-peers-now)))
+  (is (not (contains? @captured :yggstack/refresh-peer-count))))
 
 (deftest test-yggstack-update-peer-count
   (rf/dispatch-sync [:yggstack/update-peer-count 5])

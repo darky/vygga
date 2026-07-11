@@ -51,6 +51,7 @@
   #js {:generateConfig (fn [] (swap! mod-calls conj :generateConfig) (js/Promise.resolve "{\"PrivateKey\":\"test\"}"))
        :start          (fn [c s n] (swap! mod-calls conj [:start c s n]) (js/Promise.resolve))
        :stop           (fn [] (swap! mod-calls conj :stop) (js/Promise.resolve))
+       :retryPeersNow  (fn [] (swap! mod-calls conj :retryPeersNow) (js/Promise.resolve))
        :getPeersJSON   (fn [] (swap! mod-calls conj :getPeersJSON) (js/Promise.resolve "[]"))
        :getAddress     (fn [] (swap! mod-calls conj :getAddress) (js/Promise.resolve "201::1"))
        :getPublicKey   (fn [] (swap! mod-calls conj :getPublicKey) (js/Promise.resolve "pubkey123"))})
@@ -111,6 +112,15 @@
           (.then (fn [result]
                    (is (= "pubkey123" result))
                    (is (= [:getPublicKey] @mod-calls))
+                   (done)))))))
+
+(deftest test-retry-peers-now
+  (t/async done
+    (reset-calls!)
+    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+      (-> (ygg/retry-peers-now)
+          (.then (fn [_]
+                   (is (= [:retryPeersNow] @mod-calls))
                    (done)))))))
 
 (deftest test-start-foreground-service

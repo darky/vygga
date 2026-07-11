@@ -1,6 +1,7 @@
 (ns vygga.app
   (:require [vygga.events]
             [vygga.subs]
+            [vygga.network]
             [vygga.view :as view]
             [expo.root :as expo-root]
             [re-frame.core :as rf]

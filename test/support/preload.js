@@ -16,6 +16,7 @@ var stubModules = {
   'expo-clipboard': true,
   'expo-notifications': true,
   'react-native-tcp-socket': true,
+  '@react-native-community/netinfo': true,
 };
 
 Module._resolveFilename = function(request, parent) {

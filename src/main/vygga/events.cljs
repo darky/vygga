@@ -140,6 +140,32 @@
        (.then (fn [_] (rf/dispatch [:yggstack/set-status :stopped])))
        (.catch (fn [e] (js/console.error "stop error:" e))))))
 
+(rf/reg-fx
+ :yggstack/retry-peers-now
+ (fn [_]
+   (-> (ygg/retry-peers-now)
+       (.catch (fn [e]
+                 (js/console.warn "retry peers error:" e))))))
+
+(rf/reg-fx
+ :yggstack/refresh-peer-count
+ (fn [_]
+   (js/setTimeout
+    (fn []
+      (-> (ygg/get-peers)
+          (.then (fn [json] (rf/dispatch [:yggstack/update-peer-count
+                                          (.-length (js/JSON.parse json))])))
+          (.catch (fn [_]))))
+    2000)))
+
+(rf/reg-event-fx
+ :yggstack/on-network-restored
+ (fn [{db :db} _]
+   (if (= :running (get-in db [:yggstack :status]))
+     {:yggstack/retry-peers-now nil
+      :yggstack/refresh-peer-count nil}
+     (js/console.log "Yggdrasil not running, skipping network-restored actions"))))
+
 (rf/reg-event-db
  :yggstack/update-peer-count
  (fn [db [_ count]]

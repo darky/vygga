@@ -127,6 +127,10 @@ public class YggdrasilManager {
 
   // ---- Peers ----
 
+  public static void retryPeersNow() throws Exception {
+    if (instance != null) instance.retryPeersNow();
+  }
+
   public static void addPeer(String uri) throws Exception {
     if (instance != null) instance.addPeer(uri);
   }
