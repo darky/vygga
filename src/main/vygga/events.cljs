@@ -542,9 +542,9 @@
                       (assoc-in [:voip :remote-addr] from)
                       (assoc-in [:voip :started-at] ts)
                       (assoc-in [:voip :audio-seq] 0))
-               :messenger/show-incoming-notification {:from-addr from
-                                                      :text "Incoming call"
-                                                      :type :call}}
+              :messenger/show-incoming-notification {:from-addr from
+                                                     :text "Incoming call"
+                                                     :type :call}}
              (js/console.warn "Ignored call-offer: busy"))
 
            "accept"

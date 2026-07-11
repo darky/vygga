@@ -12,7 +12,7 @@
 
             ["@expo/vector-icons/Ionicons" :default Ionicons]
             ["expo-clipboard" :as Clipboard]
-            ["react-native-safe-area-context" :refer [useSafeAreaInsets]]))
+            ["react-native-safe-area-context" :refer [SafeAreaProvider useSafeAreaInsets]]))
 
 (defonce Stack (rnn-stack/createNativeStackNavigator))
 
@@ -460,7 +460,7 @@
                add-listener! (fn [^js navigation-ref]
                                (when navigation-ref
                                  (.addListener navigation-ref "state" save-root-state!)))]
-    [:> rn/View {:style {:flex 1}}
+    [:> SafeAreaProvider {:style {:flex 1}}
      [:> rnn/NavigationContainer {:ref add-listener!
                                   :initialState (when @!root-state (-> @!root-state .-data .-state))}
       [:> Stack.Navigator
