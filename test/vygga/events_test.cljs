@@ -29,6 +29,8 @@
 (rf/reg-fx :app/exit-fx (mock-fx :app/exit-fx))
 (rf/reg-fx :messenger/start-tcp-server (mock-fx :messenger/start-tcp-server))
 (rf/reg-fx :messenger/stop-tcp-server (mock-fx :messenger/stop-tcp-server))
+(rf/reg-fx :messenger/start-audio-server (mock-fx :messenger/start-audio-server))
+(rf/reg-fx :messenger/stop-audio-server (mock-fx :messenger/stop-audio-server))
 (rf/reg-fx :messenger/send-via-socks (mock-fx :messenger/send-via-socks))
 (rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
 (rf/reg-fx :messenger/show-incoming-notification (mock-fx :messenger/show-incoming-notification))
@@ -173,13 +175,17 @@
   (is (= true (get-in @rdb/app-db [:messenger :server-running])))
   (let [opts (get @captured :messenger/start-tcp-server)]
     (is (map? opts))
-    (is (= 9999 (:port opts)))))
+    (is (= 9999 (:port opts))))
+  (is (contains? @captured :messenger/start-audio-server)
+      "start-server should also start the audio server"))
 
 (deftest test-messenger-stop-server-standalone
   (reset! rdb/app-db (assoc-in app-db [:messenger :server-running] true))
   (rf/dispatch-sync [:messenger/stop-server])
   (is (= false (get-in @rdb/app-db [:messenger :server-running])))
-  (is (contains? @captured :messenger/stop-tcp-server)))
+  (is (contains? @captured :messenger/stop-tcp-server))
+  (is (contains? @captured :messenger/stop-audio-server)
+      "stop-server should also stop the audio server"))
 
 (deftest test-messenger-add-contact
   (let [addr "201:abcd::1"]

@@ -313,12 +313,14 @@
  (fn [{db :db} _]
    (let [port (get-in db [:messenger :server-port] 7777)]
      {:messenger/start-tcp-server {:port port}
+      :messenger/start-audio-server nil
       :db (assoc-in db [:messenger :server-running] true)})))
 
 (rf/reg-event-fx
  :messenger/stop-server
  (fn [{db :db} _]
    {:messenger/stop-tcp-server nil
+    :messenger/stop-audio-server nil
     :db (assoc-in db [:messenger :server-running] false)}))
 
 (rf/reg-fx
@@ -335,6 +337,16 @@
  (fn [_]
    (msg/stop-server!)
    (msg/remove-remote-mapping 7777)))
+
+(rf/reg-fx
+ :messenger/start-audio-server
+ (fn [_]
+   (msg/start-audio-server!)))
+
+(rf/reg-fx
+ :messenger/stop-audio-server
+ (fn [_]
+   (msg/stop-audio-server!)))
 
 (rf/reg-event-fx
  :messenger/send-message
@@ -561,36 +573,20 @@
 
 (rf/reg-event-fx
  :voip/incoming-audio
- (fn [{db :db} [_ msg]]
-   (let [{:keys [call-id seq data _from ts pubkey sig]} msg
-         state (get-in db [:voip])
-         current-call-id (:call-id state)]
-     (if (and (= :connected (:call-state state)) (= call-id current-call-id) pubkey sig)
-       (let [data-to-verify (str call-id "|" seq "|" data "|" ts)]
-         (if (crypto/verify-signature pubkey data-to-verify sig)
-           {:voip/play-audio {:data data}}
-           (js/console.warn "Invalid audio signature")))
-       (js/console.warn "Audio chunk ignored: not in call")))))
+ (fn [{db :db} [_ {:keys [data]}]]
+   (if (= :connected (get-in db [:voip :call-state]))
+     {:voip/play-audio {:data data}}
+     (js/console.warn "Audio chunk ignored: not in call"))))
 
 (rf/reg-event-fx
  :voip/audio-chunk-captured
  (fn [{db :db} [_ chunk]]
    (let [state (get-in db [:voip])
-         b64 (voip/bytes->base64 chunk)
-         seq (:audio-seq state)
-         call-id (:call-id state)
-         private-key (get-in db [:yggstack :private-key])
-         public-key (get-in db [:yggstack :public-key])
-         my-address (get-in db [:yggstack :address])]
+         seq (:audio-seq state)]
      (when (= :connected (:call-state state))
        {:db (assoc-in db [:voip :audio-seq] (inc seq))
-        :voip/send-audio {:data b64
-                          :seq seq
-                          :call-id call-id
-                          :private-key private-key
-                          :public-key public-key
-                          :from my-address
-                          :ts (.now js/Date)}}))))
+        :voip/send-audio {:data chunk
+                          :seq seq}}))))
 
 ;; ---- VoIP Effects ----
 
@@ -613,26 +609,18 @@
 
 (rf/reg-fx
  :voip/send-audio
- (fn [{:keys [data seq call-id private-key public-key from ts]}]
-   (let [data-to-sign (str call-id "|" seq "|" data "|" ts)
-         sig (crypto/sign-message private-key data-to-sign)
-         msg (pr-str {:type "call-audio"
-                      :call-id call-id
-                      :seq seq
-                      :data data
-                      :from from
-                      :ts ts
-                      :pubkey public-key
-                      :sig sig})]
-     (voip-conn/send! msg))))
+ (fn [{:keys [data seq]}]
+   (voip-conn/send-audio-frame! data seq)))
 
 (rf/reg-fx
  :voip/connect-audio
  (fn [{:keys [address _call-id]}]
+   (when-not (msg/audio-server-running?)
+     (msg/start-audio-server!))
    (voip/init-audio-track!)
    (voip-conn/connect! address
-                       (fn [line]
-                         (js/console.log "audio conn data:" (subs line 0 50)))
+                       (fn [data]
+                         (js/console.log "audio conn binary data length:" (.-length data)))
                        (fn [had-error]
                          (when had-error
                            (js/console.warn "audio connection error"))))))
@@ -662,8 +650,7 @@
 (rf/reg-fx
  :voip/play-audio
  (fn [{:keys [data]}]
-   (let [buf (voip/base64->bytes data)]
-     (voip/play-pcm-buffer! buf))))
+   (voip/play-pcm-buffer! data)))
 
 (rf/reg-event-fx
  :messenger/receive-incoming

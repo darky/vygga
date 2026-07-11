@@ -1,12 +1,14 @@
 (ns vygga.messenger
   (:require [vygga.tcp-server :as tcp-server]
-            [vygga.tcp-client :as tcp-client]))
+            [vygga.tcp-client :as tcp-client]
+            [vygga.audio-server :as audio-server]))
 
 (defonce native-module
   (try (-> (js/require "react-native") .-NativeModules .-YggstackModule)
        (catch js/Error _ nil)))
 
 (defonce messenger-port 7777)
+(defonce audio-port 7778)
 
 (defn- has-method [name]
   (and native-module (not (nil? (aget native-module name)))))
@@ -35,3 +37,20 @@
     (let [p (or port messenger-port)]
       (.removeRemoteTCPMapping native-module p (str "127.0.0.1:" p)))
     (js/Promise.reject (js/Error. "removeRemoteTCPMapping not available"))))
+
+;; ---- Audio server (binary TCP server + Go remote mapping) ----
+
+(defn start-audio-server! []
+  (-> (audio-server/start! audio-port)
+      (.then #(add-remote-mapping audio-port))
+      (.catch (fn [e]
+                (js/console.warn "Audio server already running:" e)))))
+
+(defn stop-audio-server! []
+  (-> (audio-server/stop!)
+      (.then #(remove-remote-mapping audio-port))
+      (.catch (fn [e]
+                (js/console.warn "Audio server stop error:" e)))))
+
+(defn audio-server-running? []
+  (audio-server/running?))

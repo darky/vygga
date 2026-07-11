@@ -18,8 +18,6 @@
           (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig]))
         "call-signal"
         (rf/dispatch [:voip/incoming-signal msg])
-        "call-audio"
-        (rf/dispatch [:voip/incoming-audio msg])
         (js/console.warn "Unknown message type:" type)))
     (catch js/Error e
       (js/console.warn "Failed to parse messenger message:" e))))

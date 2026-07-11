@@ -236,28 +236,54 @@
     (is (contains? @captured :voip/stop-capture))))
 
 (deftest test-incoming-audio
-  (let [seed (doto (js/Uint8Array. 32) (aset 0 11))
-        kp (.. js/tweetnacl -sign -keyPair (fromSeed seed))
-        pubkey (apply str (map byte->hex (array-seq (.-publicKey kp))))
-        privkey (apply str (map byte->hex (array-seq (.-secretKey kp))))
-        call-id "call-for-audio"
-        data "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGw=="
+  (let [pcm-data (js/Uint8Array. #js [0 1 2 3 4 5 6 7])
         seq-num 0
-        ts 4000
-        data-to-sign (str call-id "|" seq-num "|" data "|" ts)
-        sig (crypto/sign-message privkey data-to-sign)
-        msg {:type "call-audio"
-             :call-id call-id
-             :seq seq-num
-             :data data
-             :from "201:bbbb::1"
-             :ts ts
-             :pubkey pubkey
-             :sig sig}]
+        msg {:seq seq-num
+             :data pcm-data}]
     (reset! rdb/app-db (-> app-db
                            (assoc-in [:voip :call-state] :connected)
-                           (assoc-in [:voip :call-id] call-id)))
+                           (assoc-in [:voip :call-id] "call-id")))
     (rf/dispatch-sync [:voip/incoming-audio msg])
     (let [audio-opts (get @captured :voip/play-audio)]
       (is (map? audio-opts))
-      (is (= data (:data audio-opts))))))
+      (is (= pcm-data (:data audio-opts)))))
+  (testing "audio while idle is ignored"
+    (setup)
+    (let [pcm-data (js/Uint8Array. #js [0 1 2 3])
+          msg {:seq 0 :data pcm-data}]
+      (reset! rdb/app-db (assoc-in app-db [:voip :call-state] :idle))
+      (rf/dispatch-sync [:voip/incoming-audio msg])
+      (is (not (contains? @captured :voip/play-audio))))))
+
+(deftest test-audio-chunk-captured-raw-data
+  (let [pcm-chunk (js/Uint8Array. #js [0x10 0x20 0x30])
+        db-connected (-> app-db
+                         (assoc-in [:voip :call-state] :connected)
+                         (assoc-in [:voip :call-id] "call-1")
+                         (assoc-in [:voip :audio-seq] 5))]
+    (reset! rdb/app-db db-connected)
+    (rf/dispatch-sync [:voip/audio-chunk-captured pcm-chunk])
+    (let [audio-send (get @captured :voip/send-audio)]
+      (is (map? audio-send))
+      (is (= pcm-chunk (:data audio-send)))
+      (is (= 5 (:seq audio-send))))
+    (is (= 6 (get-in @rdb/app-db [:voip :audio-seq])))))
+
+(deftest test-audio-chunk-captured-increments-seq
+  (let [db-connected (-> app-db
+                         (assoc-in [:voip :call-state] :connected)
+                         (assoc-in [:voip :call-id] "call-1")
+                         (assoc-in [:voip :audio-seq] 0))]
+    (reset! rdb/app-db db-connected)
+    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [1])])
+    (is (= 1 (get-in @rdb/app-db [:voip :audio-seq])))
+    (is (= 0 (:seq (get @captured :voip/send-audio)))
+        "first chunk gets seq 0")
+    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [2])])
+    (is (= 2 (get-in @rdb/app-db [:voip :audio-seq])))))
+
+(deftest test-audio-chunk-captured-idle
+  (let [pcm-chunk (js/Uint8Array. #js [0x01 0x02])]
+    (reset! rdb/app-db (assoc-in app-db [:voip :call-state] :idle))
+    (rf/dispatch-sync [:voip/audio-chunk-captured pcm-chunk])
+    (is (not (contains? @captured :voip/send-audio)))))

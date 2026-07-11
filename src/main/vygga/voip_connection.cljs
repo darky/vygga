@@ -3,7 +3,7 @@
             ["react-native-tcp-socket" :as tcp]))
 
 (defonce ^:const socks-port 1080)
-(defonce ^:const messenger-port 7777)
+(defonce ^:const audio-port 7778)
 
 (defonce connection (atom nil))
 
@@ -54,7 +54,7 @@
                             addr-bytes (ipv6-to-bytes ip)
                             alen (.-length addr-bytes)
                             req (js/Uint8Array. (+ 6 alen))
-                            port messenger-port]
+                            port audio-port]
                         (aset req 0 0x05)
                         (aset req 1 0x01)
                         (aset req 2 0x00)
@@ -69,7 +69,6 @@
                   (if (and (= (aget @rx-buf 0) 0x05) (= (aget @rx-buf 1) 0x00))
                     (do
                       (reset! step 3)
-                      ;; remove data listener, forward to app
                       (.removeAllListeners socket "data")
                       (resolve socket))
                     (reject (js/Error. (str "SOCKS5 connect failed, status: "
@@ -90,10 +89,7 @@
                      (fn [^js connected-socket]
                        (.on connected-socket "data"
                             (fn [data]
-                              (let [text (.decode (js/TextDecoder.) data)]
-                                (doseq [line (.split text "\n")]
-                                  (when (not= line "")
-                                    (on-data line))))))
+                              (on-data data)))
                        (reset! connection {:socket connected-socket
                                            :target-ip target-ip})
                        (resolve true))
@@ -101,14 +97,27 @@
                        (.destroy socket)
                        (reject e)))))))))
 
-(defn send!
-  [edn-str]
+(defn send-audio-frame!
+  [^js pcm-bytes seq]
   (when-let [c @connection]
-    (let [socket (:socket c)]
-      (try
-        (.write socket (str edn-str "\n") "utf-8")
-        (catch js/Error e
-          (js/console.warn "voip send error:" e))))))
+    (let [socket (:socket c)
+          pcm-len (.-length pcm-bytes)
+          header (js/Uint8Array. 8)]
+      (aset header 0 (bit-shift-right pcm-len 24))
+      (aset header 1 (bit-shift-right pcm-len 16))
+      (aset header 2 (bit-shift-right pcm-len 8))
+      (aset header 3 pcm-len)
+      (aset header 4 (bit-shift-right seq 24))
+      (aset header 5 (bit-shift-right seq 16))
+      (aset header 6 (bit-shift-right seq 8))
+      (aset header 7 seq)
+      (let [frame (js/Uint8Array. (+ 8 pcm-len))]
+        (.set frame header 0)
+        (.set frame pcm-bytes 8)
+        (try
+          (.write socket frame)
+          (catch js/Error e
+            (js/console.warn "voip send error:" e)))))))
 
 (defn disconnect!
   []

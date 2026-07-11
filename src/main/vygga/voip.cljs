@@ -7,15 +7,7 @@
   (try (-> (js/require "react-native") .-NativeModules .-AudioTrackModule)
        (catch js/Error _ nil)))
 
-(def ^:const sample-rate 8000)
-
-(defn bytes->base64
-  [^js bytes]
-  (crypto/bytes->base64 bytes))
-
-(defn base64->bytes
-  [b64]
-  (crypto/base64->bytes b64))
+(def ^:const sample-rate 16000)
 
 (defn request-permissions!
   []
@@ -56,13 +48,14 @@
 (defn play-pcm-buffer!
   [^js buf]
   (when audio-track-module
-    (if @track-initialized?
-      (-> (.write audio-track-module (bytes->base64 buf))
-          (.catch (fn [e] (js/console.warn "audio track write error:" e))))
-      (do
-        (init-audio-track!)
-        (-> (.write audio-track-module (bytes->base64 buf))
-            (.catch (fn [e] (js/console.warn "audio track write error:" e))))))))
+    (let [b64 (crypto/bytes->base64 buf)]
+      (if @track-initialized?
+        (-> (.write audio-track-module b64)
+            (.catch (fn [e] (js/console.warn "audio track write error:" e))))
+        (do
+          (init-audio-track!)
+          (-> (.write audio-track-module b64)
+              (.catch (fn [e] (js/console.warn "audio track write error:" e)))))))))
 
 (defn stop-audio-track!
   []
