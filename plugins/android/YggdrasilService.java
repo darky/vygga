@@ -64,7 +64,6 @@ public class YggdrasilService extends Service {
   @Override
   public void onDestroy() {
     YggdrasilManager.stopInternal();
-    MessengerServer.stop();
     stopForeground(true);
     super.onDestroy();
   }

@@ -20,7 +20,6 @@
  :initialize-db
  (fn [_ _]
    (notif/init!)
-   (msg/install-message-listener!)
    {:db app-db
     :yggstack/load-and-start nil
     :messenger/load-contacts nil}))
@@ -284,9 +283,6 @@
 (rf/reg-event-fx
  :messenger/start-server
  (fn [{db :db} _]
-   ;; Install listener immediately, before server promise resolves,
-   ;; so no onMessengerMessage events are missed on re-launch
-   (msg/install-message-listener!)
    (let [port (get-in db [:messenger :server-port] 7777)]
      {:messenger/start-tcp-server {:port port}
       :db (assoc-in db [:messenger :server-running] true)})))
@@ -310,8 +306,7 @@
  :messenger/stop-tcp-server
  (fn [_]
    (msg/stop-server!)
-   (msg/remove-remote-mapping 7777)
-   (msg/uninstall-message-listener!)))
+   (msg/remove-remote-mapping 7777)))
 
 (rf/reg-event-fx
  :messenger/send-message

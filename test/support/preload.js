@@ -15,6 +15,7 @@ var stubModules = {
   '@expo/vector-icons/Ionicons': true,
   'expo-clipboard': true,
   'expo-notifications': true,
+  'react-native-tcp-socket': true,
 };
 
 Module._resolveFilename = function(request, parent) {

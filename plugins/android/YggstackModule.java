@@ -14,7 +14,6 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 public class YggstackModule extends ReactContextBaseJavaModule implements LifecycleEventListener {
 
   private static final String TAG = "YggstackModule";
-  private MessengerServer.MessageListener messageListener;
   private YggdrasilManager.LogListener logListener;
   private Runnable statusChangeListener;
 
@@ -156,39 +155,10 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   }
 
   @ReactMethod
-  public void startMessengerServer(int port, Promise promise) {
-    try {
-      MessengerServer.start(port);
-      promise.resolve(true);
-    } catch (Exception e) {
-      Log.e(TAG, "Messenger server error", e);
-      promise.reject("START_SERVER_ERROR", e.getMessage(), e);
-    }
-  }
-
-  @ReactMethod
-  public void stopMessengerServer(Promise promise) {
-    MessengerServer.stop();
-    promise.resolve(true);
-  }
-
-  @ReactMethod
   public void addListener(String eventName) {}
 
   @ReactMethod
   public void removeListeners(int count) {}
-
-  @ReactMethod
-  public void sendMessage(String targetAddr, String message, Promise promise) {
-    new Thread(() -> {
-      try {
-        MessengerClient.send(targetAddr, message);
-        promise.resolve(true);
-      } catch (Exception e) {
-        promise.reject("SEND_MESSAGE_ERROR", e.getMessage(), e);
-      }
-    }).start();
-  }
 
   // ---- Event helpers ----
 
@@ -228,10 +198,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @Override
   public void onHostResume() {
-    if (messageListener == null) {
-      messageListener = this::onMessageReceived;
-      MessengerServer.addMessageListener(messageListener);
-    }
     if (logListener == null) {
       logListener = msg -> sendEvent("onYggstackLog", msg);
       YggdrasilManager.addLogListener(logListener);
@@ -250,10 +216,6 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
 
   @Override
   public void onHostDestroy() {
-    if (messageListener != null) {
-      MessengerServer.removeMessageListener(messageListener);
-      messageListener = null;
-    }
     if (logListener != null) {
       YggdrasilManager.removeLogListener(logListener);
       logListener = null;
@@ -264,7 +226,4 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
     }
   }
 
-  private void onMessageReceived(String msg) {
-    sendEvent("onIncomingMessage", msg);
-  }
 }
