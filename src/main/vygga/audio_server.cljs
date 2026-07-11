@@ -54,7 +54,7 @@
         (reject (js/Error. "Audio server already running"))
         (let [server (.createServer tcp
                                     (fn [^js socket]
-                                      (when-let [old @current-connection]
+                                      (when-let [^js old @current-connection]
                                         (try (.destroy old) (catch js/Error _)))
                                       (reset! current-connection socket)
                                       (start-frame-parser socket)
@@ -75,8 +75,8 @@
 (defn stop! []
   (js/Promise.
    (fn [resolve reject]
-     (when-let [conn @current-connection]
-       (try (.destroy conn) (catch js/Error _))
+      (when-let [^js conn @current-connection]
+        (try (.destroy conn) (catch js/Error _))
        (reset! current-connection nil))
      (if-let [server @server-instance]
        (.close server

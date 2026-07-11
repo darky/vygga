@@ -38,7 +38,15 @@ Then run the test suite before submitting any changes.
 
 ## Code Quality
 
-After each finished task, run clj-kondo to lint Clojure(script) files:
+After each finished task, check for shadow-cljs type-inference warnings:
+
+```bash
+npx shadow-cljs compile app
+```
+
+If any `:infer-warning` warnings appear, add `^js` type hints to the relevant bindings and re-run until clean.
+
+Then run clj-kondo to lint Clojure(script) files:
 
 ```bash
 clj-kondo --lint src/main
