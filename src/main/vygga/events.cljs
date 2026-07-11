@@ -9,6 +9,8 @@
    [vygga.crypto :as crypto]
    [vygga.storage :as storage]
    [vygga.notifications :as notif]
+   [vygga.voip :as voip]
+   [vygga.voip-connection :as voip-conn]
    [vygga.db :as db :refer [app-db]]))
 
 (rf/reg-event-db
@@ -417,6 +419,251 @@
                                    :msg-id msg-id
                                    :ts ts}}
        (js/console.warn "Cannot resend: missing address or text")))))
+
+;; ---- VoIP Events ----
+
+(rf/reg-event-fx
+ :voip/call-contact
+ (fn [{db :db} [_ contact-id]]
+   (let [contact (get-in db [:messenger :contacts contact-id])
+         address (:address contact)
+         my-address (get-in db [:yggstack :address])
+         private-key (get-in db [:yggstack :private-key])
+         public-key (get-in db [:yggstack :public-key])
+         call-id (str (random-uuid))
+         ts (.now js/Date)]
+     (if (and address private-key (not= :connected (get-in db [:voip :call-state])))
+       {:db (-> db
+                (assoc-in [:voip :call-state] :calling)
+                (assoc-in [:voip :call-id] call-id)
+                (assoc-in [:voip :remote-addr] address)
+                (assoc-in [:voip :started-at] ts)
+                (assoc-in [:voip :audio-seq] 0))
+        :voip/send-signal {:call-type "offer"
+                           :call-id call-id
+                           :to address
+                           :from (or my-address "unknown")
+                           :ts ts
+                           :private-key private-key
+                           :public-key public-key}
+        :voip/connect-audio {:address address
+                             :call-id call-id}}
+       (js/console.warn "Cannot call: missing address, key, or already in call")))))
+
+(rf/reg-event-fx
+ :voip/accept-call
+ (fn [{db :db} _]
+   (let [state (get-in db [:voip])
+         private-key (get-in db [:yggstack :private-key])
+         public-key (get-in db [:yggstack :public-key])
+         my-address (get-in db [:yggstack :address])]
+     (if (= :ringing (:call-state state))
+       {:db (assoc-in db [:voip :call-state] :connected)
+        :voip/send-signal {:call-type "accept"
+                           :call-id (:call-id state)
+                           :to (:remote-addr state)
+                           :from (or my-address "unknown")
+                           :ts (.now js/Date)
+                           :private-key private-key
+                           :public-key public-key}
+        :voip/start-capture nil}
+       (js/console.warn "Cannot accept: not in ringing state")))))
+
+(rf/reg-event-fx
+ :voip/reject-call
+ (fn [{db :db} _]
+   (let [state (get-in db [:voip])
+         private-key (get-in db [:yggstack :private-key])
+         public-key (get-in db [:yggstack :public-key])
+         my-address (get-in db [:yggstack :address])]
+     (if (= :ringing (:call-state state))
+       {:db (assoc-in db [:voip] {:call-state :idle :call-id nil
+                                  :remote-addr nil :started-at nil
+                                  :audio-seq 0})
+        :voip/send-signal {:call-type "reject"
+                           :call-id (:call-id state)
+                           :to (:remote-addr state)
+                           :from (or my-address "unknown")
+                           :ts (.now js/Date)
+                           :private-key private-key
+                           :public-key public-key}
+        :voip/disconnect-audio nil}
+       (js/console.warn "Cannot reject: not in ringing state")))))
+
+(rf/reg-event-fx
+ :voip/end-call
+ (fn [{db :db} _]
+   (let [state (get-in db [:voip])
+         private-key (get-in db [:yggstack :private-key])
+         public-key (get-in db [:yggstack :public-key])
+         my-address (get-in db [:yggstack :address])]
+     (when (contains? #{:calling :ringing :connected} (:call-state state))
+       {:db (assoc-in db [:voip] {:call-state :idle :call-id nil
+                                  :remote-addr nil :started-at nil
+                                  :audio-seq 0})
+        :voip/send-signal {:call-type "end"
+                           :call-id (:call-id state)
+                           :to (:remote-addr state)
+                           :from (or my-address "unknown")
+                           :ts (.now js/Date)
+                           :private-key private-key
+                           :public-key public-key}
+        :voip/stop-capture nil
+        :voip/disconnect-audio nil}))))
+
+(rf/reg-event-fx
+ :voip/incoming-signal
+ (fn [{db :db} [_ msg]]
+   (let [{:keys [call-type call-id from _to ts pubkey sig]} msg
+         data-to-verify (str "call-signal|" call-type "|" call-id "|" ts)]
+     (if (and pubkey sig (crypto/verify-signature pubkey data-to-verify sig))
+       (let [current-state (get-in db [:voip :call-state])
+             current-call-id (get-in db [:voip :call-id])]
+         (case call-type
+           "offer"
+           (if (= :idle current-state)
+             {:db (-> db
+                      (assoc-in [:voip :call-state] :ringing)
+                      (assoc-in [:voip :call-id] call-id)
+                      (assoc-in [:voip :remote-addr] from)
+                      (assoc-in [:voip :started-at] ts)
+                      (assoc-in [:voip :audio-seq] 0))
+              :messenger/show-incoming-notification {:from-addr from
+                                                     :text "Incoming call"}}
+             (js/console.warn "Ignored call-offer: busy"))
+
+           "accept"
+           (if (and (= :calling current-state) (= call-id current-call-id))
+             {:db (assoc-in db [:voip :call-state] :connected)
+              :voip/start-capture nil
+              :voip/connect-audio {:address from
+                                   :call-id call-id}}
+             (js/console.warn "Unexpected call-accept" call-id))
+
+           "reject"
+           (if (= :calling current-state)
+             {:db (assoc-in db [:voip] {:call-state :idle :call-id nil
+                                        :remote-addr nil :started-at nil
+                                        :audio-seq 0})
+              :voip/disconnect-audio nil}
+             (js/console.warn "Unexpected call-reject" call-id))
+
+           "end"
+           (when (and current-call-id (= call-id current-call-id))
+             {:db (assoc-in db [:voip] {:call-state :idle :call-id nil
+                                        :remote-addr nil :started-at nil
+                                        :audio-seq 0})
+              :voip/stop-capture nil
+              :voip/disconnect-audio nil})
+
+           (js/console.warn "Unknown call-type:" call-type)))
+       (js/console.warn "Invalid or unsigned call signal from" from)))))
+
+(rf/reg-event-fx
+ :voip/incoming-audio
+ (fn [{db :db} [_ msg]]
+   (let [{:keys [call-id seq data _from ts pubkey sig]} msg
+         state (get-in db [:voip])
+         current-call-id (:call-id state)]
+     (if (and (= :connected (:call-state state)) (= call-id current-call-id) pubkey sig)
+       (let [data-to-verify (str call-id "|" seq "|" data "|" ts)]
+         (if (crypto/verify-signature pubkey data-to-verify sig)
+           {:voip/play-audio {:data data}}
+           (js/console.warn "Invalid audio signature")))
+       (js/console.warn "Audio chunk ignored: not in call")))))
+
+(rf/reg-event-fx
+ :voip/audio-chunk-captured
+ (fn [{db :db} [_ chunk]]
+   (let [state (get-in db [:voip])
+         b64 (voip/bytes->base64 chunk)
+         seq (:audio-seq state)
+         call-id (:call-id state)
+         private-key (get-in db [:yggstack :private-key])
+         public-key (get-in db [:yggstack :public-key])
+         my-address (get-in db [:yggstack :address])]
+     (when (= :connected (:call-state state))
+       {:db (assoc-in db [:voip :audio-seq] (inc seq))
+        :voip/send-audio {:data b64
+                          :seq seq
+                          :call-id call-id
+                          :private-key private-key
+                          :public-key public-key
+                          :from my-address
+                          :ts (.now js/Date)}}))))
+
+;; ---- VoIP Effects ----
+
+(rf/reg-fx
+ :voip/send-signal
+ (fn [{:keys [call-type call-id to from ts private-key public-key]}]
+   (let [data-to-sign (str "call-signal|" call-type "|" call-id "|" ts)
+         sig (crypto/sign-message private-key data-to-sign)
+         msg (pr-str {:type "call-signal"
+                      :call-type call-type
+                      :call-id call-id
+                      :to to
+                      :from from
+                      :ts ts
+                      :pubkey public-key
+                      :sig sig})]
+     (.then (msg/send-message to msg) nil
+            (fn [e]
+              (js/console.warn "call signal send failed:" e))))))
+
+(rf/reg-fx
+ :voip/send-audio
+ (fn [{:keys [data seq call-id private-key public-key from ts]}]
+   (let [data-to-sign (str call-id "|" seq "|" data "|" ts)
+         sig (crypto/sign-message private-key data-to-sign)
+         msg (pr-str {:type "call-audio"
+                      :call-id call-id
+                      :seq seq
+                      :data data
+                      :from from
+                      :ts ts
+                      :pubkey public-key
+                      :sig sig})]
+     (voip-conn/send! msg))))
+
+(rf/reg-fx
+ :voip/connect-audio
+ (fn [{:keys [address _call-id]}]
+   (voip/init-audio-track!)
+   (voip-conn/connect! address
+                       (fn [line]
+                         (js/console.log "audio conn data:" (subs line 0 50)))
+                       (fn [had-error]
+                         (when had-error
+                           (js/console.warn "audio connection error"))))))
+
+(rf/reg-fx
+ :voip/disconnect-audio
+ (fn [_]
+   (voip-conn/disconnect!)
+   (voip/stop-audio-track!)))
+
+(rf/reg-fx
+ :voip/start-capture
+ (fn [_]
+   (.then (voip/request-permissions!)
+          (fn []
+            (voip/start-recording!
+             (fn [chunk]
+               (rf/dispatch [:voip/audio-chunk-captured chunk]))))
+          (fn [e]
+            (js/console.error "start capture error:" e)))))
+
+(rf/reg-fx
+ :voip/stop-capture
+ (fn [_]
+   (voip/stop-recording!)))
+
+(rf/reg-fx
+ :voip/play-audio
+ (fn [{:keys [data]}]
+   (let [buf (voip/base64->bytes data)]
+     (voip/play-pcm-buffer! buf))))
 
 (rf/reg-event-fx
  :messenger/receive-incoming

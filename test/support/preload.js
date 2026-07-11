@@ -16,6 +16,7 @@ var stubModules = {
   'expo-clipboard': true,
   'expo-notifications': true,
   'react-native-tcp-socket': true,
+  'expo-audio': true,
   '@react-native-community/netinfo': true,
 };
 

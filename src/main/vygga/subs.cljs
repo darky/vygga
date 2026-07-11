@@ -37,6 +37,21 @@
    (get-in db [:messenger :current-contact])))
 
 (rf/reg-sub
+ :voip/call-state
+ (fn [db _]
+   (get-in db [:voip :call-state])))
+
+(rf/reg-sub
+ :voip/active-call
+ (fn [db _]
+   (let [v (:voip db)]
+     (when (contains? #{:calling :ringing :connected} (:call-state v))
+       {:call-state (:call-state v)
+        :call-id (:call-id v)
+        :remote-addr (:remote-addr v)
+        :started-at (:started-at v)}))))
+
+(rf/reg-sub
  :theme/preferred-scheme
  (fn [db _]
    (:preferred-scheme db)))

@@ -8,12 +8,19 @@
 
 (defn parse-and-dispatch [payload]
   (try
-    (let [{:keys [type from text id ts pubkey sig]}
+    (let [{:keys [type from text id ts pubkey sig] :as msg}
           (reader/read-string {:default (fn [tag _]
                                           (throw (js/Error. (str "Unknown EDN tag: #" tag))))}
                               payload)]
-      (when (and (= type "message") from)
-        (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig])))
+      (case type
+        "message"
+        (when from
+          (rf/dispatch [:messenger/receive-incoming from text id ts pubkey sig]))
+        "call-signal"
+        (rf/dispatch [:voip/incoming-signal msg])
+        "call-audio"
+        (rf/dispatch [:voip/incoming-audio msg])
+        (js/console.warn "Unknown message type:" type)))
     (catch js/Error e
       (js/console.warn "Failed to parse messenger message:" e))))
 

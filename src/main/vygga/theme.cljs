@@ -26,6 +26,9 @@
    :checkmark            "#8ED1FF"
    :empty-text           "#999"
    :cancel-text          "#999"
+   :call-accept          "#4CAF50"
+   :call-reject          "#F44336"
+   :call-bg              "#1a3a1a"
    :header-bg            :white
    :header-text          "#333"})
 
@@ -55,6 +58,9 @@
    :checkmark            :white
    :empty-text           "#888"
    :cancel-text          "#888"
+   :call-accept          "#4CAF50"
+   :call-reject          "#F44336"
+   :call-bg              "#0a2a0a"
    :header-bg            "#1E1E1E"
    :header-text          "#E0E0E0"})
 
