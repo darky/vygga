@@ -21,6 +21,7 @@
       "bundleIdentifier": "com.vygga.app"
     },
     "plugins": [
+      "./plugins/withBuildVariants",
       "./plugins/withYggstack",
       "./plugins/withNotificationSound",
       "./plugins/withAudioTrack",
