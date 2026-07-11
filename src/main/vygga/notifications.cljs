@@ -1,8 +1,9 @@
 (ns vygga.notifications
-  (:require ["expo-notifications" :as notifications]))
+  (:require ["expo-notifications" :as notifications]
+            [vygga.voip :as voip]))
 
 (defonce ^:const channel-id "messages_channel")
-(defonce ^:const call-channel-id "calls_channel")
+(defonce ^:const call-channel-id "ringtone_calls")
 
 (defn init! []
   (notifications/setNotificationHandler
@@ -17,12 +18,7 @@
                                                            :sound "music_marimba_chord"
                                                            :vibrationPattern [0 100 100 100]}))
       (.catch (fn [e] (js/console.warn "notif channel error:" e))))
-  (-> (notifications/setNotificationChannelAsync call-channel-id
-                                                 (clj->js {:name "Calls"
-                                                           :importance (.-HIGH ^js (.-AndroidImportance notifications))
-                                                           :sound nil
-                                                           :vibrationPattern [0 100 100 100]}))
-      (.catch (fn [e] (js/console.warn "calls channel error:" e)))))
+  (voip/create-call-channel))
 
 (defn show-message! [sender text]
   (-> (notifications/scheduleNotificationAsync
@@ -35,7 +31,7 @@
 (defn show-call! [sender]
   (-> (notifications/scheduleNotificationAsync
        (clj->js {:content {:title (str "Incoming call from " sender)
-                           :body "Incoming call"
-                           :sound nil}
-                 :trigger nil}))
+                           :body "Incoming call"}
+                 :trigger {:type "channel"
+                           :channelId call-channel-id}}))
       (.catch (fn [e] (js/console.warn "show call notification error:" e)))))

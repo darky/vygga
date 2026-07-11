@@ -57,6 +57,12 @@
           (-> (.write audio-track-module b64)
               (.catch (fn [e] (js/console.warn "audio track write error:" e)))))))))
 
+(defn create-call-channel []
+  (when audio-track-module
+    (-> (.createCallChannel audio-track-module)
+        (.then #(js/console.log "call channel created"))
+        (.catch (fn [e] (js/console.warn "call channel error:" e))))))
+
 (defn stop-audio-track!
   []
   (when audio-track-module

@@ -18,14 +18,10 @@
         orig-channel (.-setNotificationChannelAsync mod)]
     (set! (.-setNotificationChannelAsync mod) (fn [id cfg] (swap! channel-calls conj {:id id :cfg cfg}) (js/Promise.resolve)))
     (notif/init!)
-    (is (= 2 (count @channel-calls)) "setNotificationChannelAsync should be called twice")
-    (let [msg-channel (first @channel-calls)
-          call-channel (second @channel-calls)]
+    (is (= 1 (count @channel-calls)) "setNotificationChannelAsync should be called once for messages")
+    (let [msg-channel (first @channel-calls)]
       (is (= "messages_channel" (:id msg-channel)))
-      (is (= "Messages" (.-name (:cfg msg-channel))))
-      (is (= "calls_channel" (:id call-channel)))
-      (is (= "Calls" (.-name (:cfg call-channel))))
-      (is (nil? (.-sound (:cfg call-channel))) "call channel should use default sound"))
+      (is (= "Messages" (.-name (:cfg msg-channel)))))
     (set! (.-setNotificationChannelAsync mod) orig-channel)))
 
 (deftest test-show-message-calls-schedule
@@ -65,6 +61,6 @@
     (let [req (first @calls)]
       (is (= "Incoming call from 201:aaaa::1" (.. req -content -title)))
       (is (= "Incoming call" (.. req -content -body)))
-      (is (nil? (.. req -content -sound)) "call notification should use default sound")
-      (is (nil? (.. req -trigger))))
+      (is (= "channel" (.. req -trigger -type)) "trigger type should be channel")
+      (is (= "ringtone_calls" (.. req -trigger -channelId)) "trigger should target ringtone channel"))
     (set! (.-scheduleNotificationAsync mod) orig)))
