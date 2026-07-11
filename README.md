@@ -15,6 +15,8 @@
 
 # Vygga — Decentralized P2P Messenger over Yggdrasil
 
+> **⚠️ Alpha / Experimental** — Vygga is in early development and alpha testing. Features may be incomplete, unstable, or change significantly. Use at your own risk.
+
 Vygga is a **serverless, peer-to-peer messaging app for Android** that communicates over the [Yggdrasil](https://yggdrasil-network.github.io/) IPv6 mesh network. No central servers, no internet access, no phone numbers — just direct encrypted peer-to-peer messaging.
 
 Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a **Go native module** (yggstack via gomobile) providing full Yggdrasil node capabilities directly on the device.
@@ -22,6 +24,7 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 ## Features
 
 - **P2P Messaging** — Send and receive messages directly between devices over the Yggdrasil mesh (messages are ephemeral — cleared on app restart)
+- **Audio Calls** — Peer-to-peer audio calls over the Yggdrasil mesh
 - **Cryptographic Identity** — Ed25519 keypair generated on-device; messages are signed and verified via tweetnacl
 - **Contact Management** — Add contacts by Yggdrasil IPv6 address; unknown senders auto-create contacts
 - **Secure Storage** — Identity (private key) persisted via expo-secure-store (Android Keystore)
