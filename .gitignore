@@ -8,3 +8,4 @@
 /.clj-kondo/.cache/
 /android/
 /ios
+plugins/android-audiotrack/jniLibs/

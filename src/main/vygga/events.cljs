@@ -621,6 +621,7 @@
    (when-not (msg/audio-server-running?)
      (msg/start-audio-server!))
    (voip/init-audio-track!)
+   (voip/init-codec!)
    (voip-conn/connect! address
                        (fn [data]
                          (js/console.log "audio conn binary data length:" (.-length data)))
@@ -631,6 +632,7 @@
 (rf/reg-fx
  :voip/disconnect-audio
  (fn [_]
+   (voip/stop-codec!)
    (voip-conn/disconnect!)
    (voip/stop-audio-track!)))
 
@@ -653,7 +655,7 @@
 (rf/reg-fx
  :voip/play-audio
  (fn [{:keys [data]}]
-   (voip/play-pcm-buffer! data)))
+   (voip/play-opus-buffer! data)))
 
 (rf/reg-event-fx
  :messenger/receive-incoming

@@ -237,36 +237,36 @@
     (is (contains? @captured :voip/stop-capture))))
 
 (deftest test-incoming-audio
-  (let [pcm-data (js/Uint8Array. #js [0 1 2 3 4 5 6 7])
+  (let [opus-data (js/Uint8Array. #js [0x42 0x43 0x44])
         seq-num 0
         msg {:seq seq-num
-             :data pcm-data}]
+             :data opus-data}]
     (reset! rdb/app-db (-> app-db
                            (assoc-in [:voip :call-state] :connected)
                            (assoc-in [:voip :call-id] "call-id")))
     (rf/dispatch-sync [:voip/incoming-audio msg])
     (let [audio-opts (get @captured :voip/play-audio)]
       (is (map? audio-opts))
-      (is (= pcm-data (:data audio-opts)))))
+      (is (= opus-data (:data audio-opts)))))
   (testing "audio while idle is ignored"
     (setup)
-    (let [pcm-data (js/Uint8Array. #js [0 1 2 3])
-          msg {:seq 0 :data pcm-data}]
+    (let [opus-data (js/Uint8Array. #js [0x42 0x43])
+          msg {:seq 0 :data opus-data}]
       (reset! rdb/app-db (assoc-in app-db [:voip :call-state] :idle))
       (rf/dispatch-sync [:voip/incoming-audio msg])
       (is (not (contains? @captured :voip/play-audio))))))
 
 (deftest test-audio-chunk-captured-raw-data
-  (let [pcm-chunk (js/Uint8Array. #js [0x10 0x20 0x30])
+  (let [opus-chunk (js/Uint8Array. #js [0x42 0x43 0x44])
         db-connected (-> app-db
                          (assoc-in [:voip :call-state] :connected)
                          (assoc-in [:voip :call-id] "call-1")
                          (assoc-in [:voip :audio-seq] 5))]
     (reset! rdb/app-db db-connected)
-    (rf/dispatch-sync [:voip/audio-chunk-captured pcm-chunk])
+    (rf/dispatch-sync [:voip/audio-chunk-captured opus-chunk])
     (let [audio-send (get @captured :voip/send-audio)]
       (is (map? audio-send))
-      (is (= pcm-chunk (:data audio-send)))
+      (is (= opus-chunk (:data audio-send)))
       (is (= 5 (:seq audio-send))))
     (is (= 6 (get-in @rdb/app-db [:voip :audio-seq])))))
 
@@ -276,15 +276,15 @@
                          (assoc-in [:voip :call-id] "call-1")
                          (assoc-in [:voip :audio-seq] 0))]
     (reset! rdb/app-db db-connected)
-    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [1])])
+    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [0x42])])
     (is (= 1 (get-in @rdb/app-db [:voip :audio-seq])))
     (is (= 0 (:seq (get @captured :voip/send-audio)))
         "first chunk gets seq 0")
-    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [2])])
+    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [0x43])])
     (is (= 2 (get-in @rdb/app-db [:voip :audio-seq])))))
 
 (deftest test-audio-chunk-captured-idle
-  (let [pcm-chunk (js/Uint8Array. #js [0x01 0x02])]
+  (let [opus-chunk (js/Uint8Array. #js [0x42 0x43])]
     (reset! rdb/app-db (assoc-in app-db [:voip :call-state] :idle))
-    (rf/dispatch-sync [:voip/audio-chunk-captured pcm-chunk])
+    (rf/dispatch-sync [:voip/audio-chunk-captured opus-chunk])
     (is (not (contains? @captured :voip/send-audio)))))

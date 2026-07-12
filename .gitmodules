@@ -1,3 +1,6 @@
 [submodule "vendor/yggstack"]
 	path = vendor/yggstack
 	url = https://github.com/DrewCyber/yggstack.git
+[submodule "vendor/opus/libopus"]
+	path = vendor/opus/libopus
+	url = https://gitlab.xiph.org/xiph/opus.git

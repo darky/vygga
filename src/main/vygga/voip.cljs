@@ -1,13 +1,12 @@
 (ns vygga.voip
-  (:require [vygga.crypto :as crypto]
-            ["expo-audio" :as audio]))
+  (:require ["expo-audio" :as audio]))
 
 (defonce stream (atom nil))
 (defonce audio-track-module
   (try (-> (js/require "react-native") .-NativeModules .-AudioTrackModule)
        (catch js/Error _ nil)))
 
-(def ^:const sample-rate 16000)
+(def ^:const sample-rate 24000)
 
 (defn request-permissions!
   []
@@ -25,7 +24,13 @@
     (.addListener s "audioStreamBuffer"
                   (fn [^js buf]
                     (let [view (js/Uint8Array. (.-data buf))]
-                      (on-chunk view))))
+                      (if audio-track-module
+                        (-> (.encode audio-track-module (js/Array.from view))
+                            (.then (fn [^js opus-arr]
+                                     (on-chunk (js/Uint8Array. opus-arr))))
+                            (.catch (fn [e]
+                                      (js/console.warn "opus encode error:" e))))
+                        (js/console.warn "no audio-track-module for encode")))))
     (.then (.start s)
            (fn [] (reset! stream s))
            (fn [e] (js/console.error "start recording error:" e)))))
@@ -45,17 +50,24 @@
     (-> (.init audio-track-module sample-rate)
         (.catch (fn [e] (js/console.error "audio track init error:" e))))))
 
-(defn play-pcm-buffer!
-  [^js buf]
+(defn init-codec!
+  []
   (when audio-track-module
-    (let [b64 (crypto/bytes->base64 buf)]
-      (if @track-initialized?
-        (-> (.write audio-track-module b64)
-            (.catch (fn [e] (js/console.warn "audio track write error:" e))))
-        (do
-          (init-audio-track!)
-          (-> (.write audio-track-module b64)
-              (.catch (fn [e] (js/console.warn "audio track write error:" e)))))))))
+    (-> (.initCodec audio-track-module sample-rate 24000)
+        (.catch (fn [e] (js/console.error "codec init error:" e))))))
+
+(defn stop-codec!
+  []
+  (when audio-track-module
+    (-> (.stopCodec audio-track-module)
+        (.catch (fn [e] (js/console.warn "codec stop error:" e))))))
+
+(defn play-opus-buffer!
+  [^js opus-buf]
+  (when audio-track-module
+    (let [arr (js/Array.from opus-buf)]
+      (-> (.decodeAndPlay audio-track-module arr)
+          (.catch (fn [e] (js/console.warn "opus decode/play error:" e)))))))
 
 (defn create-call-channel []
   (when audio-track-module
