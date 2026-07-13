@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-java@v4
         with:
@@ -48,7 +50,15 @@ jobs:
             .shadow-cljs
           key: ${{ runner.os }}-shadow-${{ hashFiles('deps.edn', 'shadow-cljs.edn') }}
 
+      - name: Setup Emscripten
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git /tmp/emsdk
+          /tmp/emsdk/emsdk install 3.1.73
+          /tmp/emsdk/emsdk activate 3.1.73
+          echo "/tmp/emsdk/upstream/emscripten" >> $GITHUB_PATH
+
       - run: npm ci
+      - run: npm run opus-wasm
 
       - name: Compile + Test
         run: npm test

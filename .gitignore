@@ -8,4 +8,4 @@
 /.clj-kondo/.cache/
 /android/
 /ios
-plugins/android-audiotrack/jniLibs/
+src/main/vygga/opus_enc.js
