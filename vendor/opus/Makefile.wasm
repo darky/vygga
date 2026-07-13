@@ -166,7 +166,7 @@ $(OUT_JS):
 		$(OPUS_DIR)/silk/float/sort_FLP.c \
 		$(WRAP_SRC) \
 		-o $(OUT_JS)
-	mkdir -p $(dir $(OUT_APP)) && cp $(OUT_JS) $(OUT_APP)
+	cp $(OUT_JS) $(OUT_APP)
 	@echo "Copied to $(OUT_APP)"
 
 clean:
