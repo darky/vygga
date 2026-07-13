@@ -23,8 +23,6 @@
 (rf/reg-fx :voip/send-signal (mock-fx :voip/send-signal))
 (rf/reg-fx :voip/connect-audio (mock-fx :voip/connect-audio))
 (rf/reg-fx :voip/disconnect-audio (mock-fx :voip/disconnect-audio))
-(rf/reg-fx :voip/start-capture (mock-fx :voip/start-capture))
-(rf/reg-fx :voip/stop-capture (mock-fx :voip/stop-capture))
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
@@ -88,7 +86,6 @@
     (let [signal (get @captured :voip/send-signal)]
       (is (map? signal))
       (is (= "accept" (:call-type signal))))
-    (is (contains? @captured :voip/start-capture))
     (is (contains? @captured :voip/connect-audio)
         "accepting call should connect audio for bidirectional communication")))
 
@@ -129,8 +126,6 @@
             (str "end from " s " resets to idle"))
         (is (contains? @captured :voip/send-signal)
             (str "end from " s " sends signal"))
-        (is (contains? @captured :voip/stop-capture)
-            (str "end from " s " stops capture"))
         (is (contains? @captured :voip/disconnect-audio)
             (str "end from " s " disconnects audio"))))))
 
@@ -201,7 +196,6 @@
         (reset! rdb/app-db db-calling)
         (rf/dispatch-sync [:voip/incoming-signal msg])
         (is (= :connected (get-in @rdb/app-db [:voip :call-state])))
-        (is (contains? @captured :voip/start-capture))
         (is (contains? @captured :voip/connect-audio))))
     (testing "accept while idle is ignored"
       (setup)
@@ -231,7 +225,6 @@
                            (assoc-in [:voip :remote-addr] "201:bbbb::1")))
     (rf/dispatch-sync [:voip/incoming-signal msg])
     (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
-    (is (contains? @captured :voip/disconnect-audio))
-    (is (contains? @captured :voip/stop-capture))))
+    (is (contains? @captured :voip/disconnect-audio))))
 
 

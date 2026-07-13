@@ -465,7 +465,6 @@
                            :ts (.now js/Date)
                            :private-key private-key
                            :public-key public-key}
-        :voip/start-capture nil
         :voip/connect-audio {:address (:remote-addr state)
                              :call-id (:call-id state)}}
        (js/console.warn "Cannot accept: not in ringing state")))))
@@ -509,7 +508,6 @@
                            :ts (.now js/Date)
                            :private-key private-key
                            :public-key public-key}
-        :voip/stop-capture nil
         :voip/disconnect-audio nil}))))
 
 (rf/reg-event-fx
@@ -537,7 +535,6 @@
            "accept"
            (if (and (= :calling current-state) (= call-id current-call-id))
              {:db (assoc-in db [:voip :call-state] :connected)
-              :voip/start-capture nil
               :voip/connect-audio {:address from
                                    :call-id call-id}}
              (js/console.warn "Unexpected call-accept" call-id))
@@ -555,7 +552,6 @@
              {:db (assoc-in db [:voip] {:call-state :idle :call-id nil
                                         :remote-addr nil :started-at nil
                                         :audio-seq 0})
-              :voip/stop-capture nil
               :voip/disconnect-audio nil})
 
            (js/console.warn "Unknown call-type:" call-type)))
@@ -583,9 +579,12 @@
 (rf/reg-fx
  :voip/connect-audio
  (fn [{:keys [address _call-id]}]
-   (when voip/audio-track-module
-     (-> (.initUdpAudio voip/audio-track-module 7778 address 7778)
-         (.catch (fn [e] (js/console.warn "UDP audio init error:" e)))))))
+   (-> (.then (voip/request-permissions!)
+              (fn []
+                (when voip/audio-track-module
+                  (-> (.initUdpAudio voip/audio-track-module 7778 address 7778)
+                      (.catch (fn [e] (js/console.warn "UDP audio init error:" e)))))))
+       (.catch (fn [e] (js/console.error "Audio permission denied:" e))))))
 
 (rf/reg-fx
  :voip/disconnect-audio
@@ -596,20 +595,11 @@
 
 (rf/reg-fx
  :voip/start-capture
- (fn [_]
-   (.then (voip/request-permissions!)
-          (fn []
-            (voip/start-recording-udp!
-             (fn [^js view]
-               (when voip/audio-track-module
-                 (.encodeAndSendUdp voip/audio-track-module (js/Array.from view))))))
-          (fn [e]
-            (js/console.error "start capture error:" e)))))
+ (fn [_]))
 
 (rf/reg-fx
  :voip/stop-capture
- (fn [_]
-   (voip/stop-recording!)))
+ (fn [_]))
 
 (rf/reg-event-fx
  :messenger/receive-incoming
