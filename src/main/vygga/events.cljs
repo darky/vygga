@@ -10,7 +10,6 @@
    [vygga.storage :as storage]
    [vygga.notifications :as notif]
    [vygga.voip :as voip]
-   [vygga.voip-connection :as voip-conn]
    [vygga.db :as db :refer [app-db]]))
 
 (rf/reg-event-db
@@ -315,14 +314,12 @@
  (fn [{db :db} _]
    (let [port (get-in db [:messenger :server-port] 7777)]
      {:messenger/start-tcp-server {:port port}
-      :messenger/start-audio-server nil
       :db (assoc-in db [:messenger :server-running] true)})))
 
 (rf/reg-event-fx
  :messenger/stop-server
  (fn [{db :db} _]
    {:messenger/stop-tcp-server nil
-    :messenger/stop-audio-server nil
     :db (assoc-in db [:messenger :server-running] false)}))
 
 (rf/reg-fx
@@ -339,16 +336,6 @@
  (fn [_]
    (msg/stop-server!)
    (msg/remove-remote-mapping 7777)))
-
-(rf/reg-fx
- :messenger/start-audio-server
- (fn [_]
-   (msg/start-audio-server!)))
-
-(rf/reg-fx
- :messenger/stop-audio-server
- (fn [_]
-   (msg/stop-audio-server!)))
 
 (rf/reg-event-fx
  :messenger/send-message
@@ -574,23 +561,6 @@
            (js/console.warn "Unknown call-type:" call-type)))
        (js/console.warn "Invalid or unsigned call signal from" from)))))
 
-(rf/reg-event-fx
- :voip/incoming-audio
- (fn [{db :db} [_ {:keys [data]}]]
-   (if (= :connected (get-in db [:voip :call-state]))
-     {:voip/play-audio {:data data}}
-     (js/console.warn "Audio chunk ignored: not in call"))))
-
-(rf/reg-event-fx
- :voip/audio-chunk-captured
- (fn [{db :db} [_ chunk]]
-   (let [state (get-in db [:voip])
-         seq (:audio-seq state)]
-     (when (= :connected (:call-state state))
-       {:db (assoc-in db [:voip :audio-seq] (inc seq))
-        :voip/send-audio {:data chunk
-                          :seq seq}}))))
-
 ;; ---- VoIP Effects ----
 
 (rf/reg-fx
@@ -611,39 +581,28 @@
               (js/console.warn "call signal send failed:" e))))))
 
 (rf/reg-fx
- :voip/send-audio
- (fn [{:keys [data seq]}]
-   (voip-conn/send-audio-frame! data seq)))
-
-(rf/reg-fx
  :voip/connect-audio
  (fn [{:keys [address _call-id]}]
-   (when-not (msg/audio-server-running?)
-     (msg/start-audio-server!))
-   (voip/init-audio-track!)
-   (voip/init-codec!)
-   (voip-conn/connect! address
-                       (fn [data]
-                         (js/console.log "audio conn binary data length:" (.-length data)))
-                       (fn [had-error]
-                         (when had-error
-                           (js/console.warn "audio connection error"))))))
+   (when voip/audio-track-module
+     (-> (.initUdpAudio voip/audio-track-module 7778 address 7778)
+         (.catch (fn [e] (js/console.warn "UDP audio init error:" e)))))))
 
 (rf/reg-fx
  :voip/disconnect-audio
  (fn [_]
-   (voip/stop-codec!)
-   (voip-conn/disconnect!)
-   (voip/stop-audio-track!)))
+   (when voip/audio-track-module
+     (-> (.stopUdpAudio voip/audio-track-module)
+         (.catch (fn [e] (js/console.warn "UDP audio stop error:" e)))))))
 
 (rf/reg-fx
  :voip/start-capture
  (fn [_]
    (.then (voip/request-permissions!)
           (fn []
-            (voip/start-recording!
-             (fn [chunk]
-               (rf/dispatch [:voip/audio-chunk-captured chunk]))))
+            (voip/start-recording-udp!
+             (fn [^js view]
+               (when voip/audio-track-module
+                 (.encodeAndSendUdp voip/audio-track-module (js/Array.from view))))))
           (fn [e]
             (js/console.error "start capture error:" e)))))
 
@@ -651,11 +610,6 @@
  :voip/stop-capture
  (fn [_]
    (voip/stop-recording!)))
-
-(rf/reg-fx
- :voip/play-audio
- (fn [{:keys [data]}]
-   (voip/play-opus-buffer! data)))
 
 (rf/reg-event-fx
  :messenger/receive-incoming

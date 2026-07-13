@@ -153,6 +153,24 @@ public class YggdrasilManager {
     if (instance != null) instance.clearRemoteMappings();
   }
 
+  // ---- UDP mappings ----
+
+  public static void addRemoteUDPMapping(int remotePort, String localAddr) throws Exception {
+    if (instance != null) instance.addRemoteUDPMapping(remotePort, localAddr);
+  }
+
+  public static void removeRemoteUDPMapping(int remotePort, String localAddr) throws Exception {
+    if (instance != null) instance.removeRemoteUDPMapping(remotePort, localAddr);
+  }
+
+  public static void addLocalUDPMapping(String localAddr, String remoteAddr) throws Exception {
+    if (instance != null) instance.addLocalUDPMapping(localAddr, remoteAddr);
+  }
+
+  public static void removeLocalUDPMapping(String localAddr, String remoteAddr) throws Exception {
+    if (instance != null) instance.removeLocalUDPMapping(localAddr, remoteAddr);
+  }
+
   // ---- Config generation ----
 
   public static String generateConfig() {

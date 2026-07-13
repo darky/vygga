@@ -165,6 +165,46 @@ public class YggstackModule extends ReactContextBaseJavaModule implements Lifecy
   }
 
   @ReactMethod
+  public void addRemoteUDPMapping(int remotePort, String localAddr, Promise promise) {
+    try {
+      YggdrasilManager.addRemoteUDPMapping(remotePort, localAddr);
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_REMOTE_UDP_MAP_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
+  public void removeRemoteUDPMapping(int remotePort, String localAddr, Promise promise) {
+    try {
+      YggdrasilManager.removeRemoteUDPMapping(remotePort, localAddr);
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_REMOVE_REMOTE_UDP_MAP_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
+  public void addLocalUDPMapping(String localAddr, String remoteAddr, Promise promise) {
+    try {
+      YggdrasilManager.addLocalUDPMapping(localAddr, remoteAddr);
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_LOCAL_UDP_MAP_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
+  public void removeLocalUDPMapping(String localAddr, String remoteAddr, Promise promise) {
+    try {
+      YggdrasilManager.removeLocalUDPMapping(localAddr, remoteAddr);
+      promise.resolve(true);
+    } catch (Exception e) {
+      promise.reject("YGGSTACK_REMOVE_LOCAL_UDP_MAP_ERROR", e.getMessage(), e);
+    }
+  }
+
+  @ReactMethod
   public void addListener(String eventName) {}
 
   @ReactMethod

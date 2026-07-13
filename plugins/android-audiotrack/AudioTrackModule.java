@@ -10,21 +10,27 @@ import android.media.AudioTrack;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
-import android.util.Base64;
 import android.util.Log;
 
-import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
-import com.facebook.react.bridge.WritableArray;
+
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
+
+import expo.modules.yggstack.YggdrasilManager;
 
 public class AudioTrackModule extends ReactContextBaseJavaModule {
 
   private static final String TAG = "AudioTrackModule";
   private static final int OPUS_APPLICATION_VOIP = 2048;
+
+  private static final int UDP_RECV_PORT = 7778;
+  private static final int UDP_SEND_PORT = 9778;
 
   private AudioTrack audioTrack;
   private int sampleRate;
@@ -33,6 +39,14 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
   private long opusDecoder;
   private byte[] encodeBuf;
   private byte[] decodeBuf;
+
+  private DatagramSocket recvSocket;
+  private DatagramSocket sendSocket;
+  private InetSocketAddress sendAddr;
+  private Thread recvThread;
+  private volatile boolean udpRunning;
+  private String remoteYggIp;
+  private int remotePort;
 
   AudioTrackModule(ReactApplicationContext context) {
     super(context);
@@ -71,77 +85,31 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void init(int sampleRate, Promise promise) {
+  public void addListener(String eventName) {}
+
+  @ReactMethod
+  public void removeListeners(int count) {}
+
+  // ---- UDP Audio ----
+
+  @ReactMethod
+  public void initUdpAudio(int localRecvPort, String remoteYggIp, int remotePort, Promise promise) {
     try {
       release();
-      this.sampleRate = sampleRate;
+      releaseCodec();
+      this.sampleRate = 24000;
+      this.remoteYggIp = remoteYggIp;
+      this.remotePort = remotePort;
+
       int channelConfig = AudioFormat.CHANNEL_OUT_MONO;
       int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
       int bufferSize = Math.max(
-        AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat),
-        4096
-      );
+        AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat), 4096);
       audioTrack = new AudioTrack(
-        AudioManager.STREAM_VOICE_CALL,
-        sampleRate,
-        channelConfig,
-        audioFormat,
-        bufferSize,
-        AudioTrack.MODE_STREAM
-      );
+        AudioManager.STREAM_VOICE_CALL, sampleRate, channelConfig, audioFormat,
+        bufferSize, AudioTrack.MODE_STREAM);
       audioTrack.play();
-      Log.d(TAG, "AudioTrack initialized: " + sampleRate + "Hz, buffer=" + bufferSize);
-      promise.resolve(true);
-    } catch (Exception e) {
-      Log.e(TAG, "init error", e);
-      promise.reject("AUDIOTRACK_INIT_ERROR", e.getMessage(), e);
-    }
-  }
 
-  @ReactMethod
-  public void write(String base64PCM, Promise promise) {
-    try {
-      if (audioTrack == null) {
-        promise.reject("AUDIOTRACK_NOT_INITIALIZED", "Call init() before write()");
-        return;
-      }
-      byte[] pcmData = Base64.decode(base64PCM, Base64.DEFAULT);
-      int written = audioTrack.write(pcmData, 0, pcmData.length);
-      promise.resolve(written);
-    } catch (Exception e) {
-      Log.e(TAG, "write error", e);
-      promise.reject("AUDIOTRACK_WRITE_ERROR", e.getMessage(), e);
-    }
-  }
-
-  @ReactMethod
-  public void stop(Promise promise) {
-    try {
-      release();
-      promise.resolve(true);
-    } catch (Exception e) {
-      Log.e(TAG, "stop error", e);
-      promise.reject("AUDIOTRACK_STOP_ERROR", e.getMessage(), e);
-    }
-  }
-
-  @ReactMethod
-  public void flush(Promise promise) {
-    try {
-      if (audioTrack != null) {
-        audioTrack.flush();
-      }
-      promise.resolve(true);
-    } catch (Exception e) {
-      Log.e(TAG, "flush error", e);
-      promise.reject("AUDIOTRACK_FLUSH_ERROR", e.getMessage(), e);
-    }
-  }
-
-  @ReactMethod
-  public void initCodec(int sampleRate, int bitrate, Promise promise) {
-    try {
-      releaseCodec();
       opusEncoder = OpusBridge.nativeEncoderCreate(sampleRate, 1, OPUS_APPLICATION_VOIP);
       if (opusEncoder == 0) {
         promise.reject("OPUS_ENCODER_CREATE_ERROR", "Failed to create Opus encoder");
@@ -156,80 +124,106 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
       }
       encodeBuf = new byte[4000];
       decodeBuf = new byte[sampleRate * 2 * 120 / 1000];
-      Log.d(TAG, "Opus codec initialized: " + sampleRate + "Hz, " + bitrate + "bps");
+
+      int recvPort = localRecvPort > 0 ? localRecvPort : UDP_RECV_PORT;
+
+      recvSocket = new DatagramSocket(new InetSocketAddress("127.0.0.1", recvPort));
+      YggdrasilManager.addRemoteUDPMapping(recvPort, "127.0.0.1:" + recvPort);
+
+      int sendPort = recvPort == UDP_RECV_PORT ? UDP_SEND_PORT : recvPort + 2000;
+      sendAddr = new InetSocketAddress("127.0.0.1", sendPort);
+      sendSocket = new DatagramSocket();
+
+      String localSendAddr = "127.0.0.1:" + sendPort;
+      String remoteSendAddr = "[" + remoteYggIp + "]:" + remotePort;
+      YggdrasilManager.addLocalUDPMapping(localSendAddr, remoteSendAddr);
+
+      udpRunning = true;
+      recvThread = new Thread(this::udpReceiveLoop);
+      recvThread.start();
+
+      Log.d(TAG, "UDP audio initialized: recv=" + recvPort + " send=127.0.0.1:" + sendPort
+            + " -> " + remoteSendAddr);
       promise.resolve(true);
     } catch (Exception e) {
-      Log.e(TAG, "initCodec error", e);
-      promise.reject("OPUS_INIT_ERROR", e.getMessage(), e);
+      Log.e(TAG, "initUdpAudio error", e);
+      promise.reject("UDP_INIT_ERROR", e.getMessage(), e);
     }
   }
 
   @ReactMethod
-  public void encode(ReadableArray pcmBytes, Promise promise) {
+  public void encodeAndSendUdp(ReadableArray pcmBytes) {
     try {
-      if (opusEncoder == 0) {
-        promise.reject("OPUS_NOT_INITIALIZED", "Call initCodec() before encode()");
-        return;
-      }
+      if (opusEncoder == 0) return;
       byte[] pcm = toByteArray(pcmBytes);
       int frameSize = pcm.length / 2;
-      if (frameSize < 60) {
-        promise.reject("OPUS_FRAME_TOO_SMALL", "PCM frame too small: " + frameSize + " samples");
-        return;
-      }
+      if (frameSize < 60) return;
       int len = OpusBridge.nativeEncoderEncode(opusEncoder, pcm, frameSize, encodeBuf);
-      if (len < 0) {
-        promise.reject("OPUS_ENCODE_ERROR", "Opus encode failed: " + len);
-        return;
-      }
-      promise.resolve(toWritableArray(encodeBuf, len));
+      if (len < 0) return;
+      DatagramPacket pkt = new DatagramPacket(encodeBuf, len, sendAddr);
+      sendSocket.send(pkt);
     } catch (Exception e) {
-      Log.e(TAG, "encode error", e);
-      promise.reject("OPUS_ENCODE_ERROR", e.getMessage(), e);
+      Log.w(TAG, "encodeAndSendUdp error", e);
     }
   }
 
   @ReactMethod
-  public void decodeAndPlay(ReadableArray opusBytes, Promise promise) {
+  public void stopUdpAudio(Promise promise) {
     try {
-      if (opusDecoder == 0) {
-        promise.reject("OPUS_NOT_INITIALIZED", "Call initCodec() before decodeAndPlay()");
-        return;
-      }
-      if (audioTrack == null) {
-        promise.reject("AUDIOTRACK_NOT_INITIALIZED", "Call init() before decodeAndPlay()");
-        return;
-      }
-      byte[] opus = toByteArray(opusBytes);
-      int pcmLen = OpusBridge.nativeDecoderDecode(opusDecoder, opus, opus.length, decodeBuf);
-      if (pcmLen < 0) {
-        promise.reject("OPUS_DECODE_ERROR", "Opus decode failed: " + pcmLen);
-        return;
-      }
-      int written = audioTrack.write(decodeBuf, 0, pcmLen);
-      promise.resolve(written);
-    } catch (Exception e) {
-      Log.e(TAG, "decodeAndPlay error", e);
-      promise.reject("OPUS_DECODE_ERROR", e.getMessage(), e);
-    }
-  }
+      udpRunning = false;
 
-  @ReactMethod
-  public void stopCodec(Promise promise) {
-    try {
+      if (recvSocket != null) {
+        recvSocket.close();
+        recvSocket = null;
+      }
+      if (sendSocket != null) {
+        sendSocket.close();
+        sendSocket = null;
+      }
+
+      String localSend = "127.0.0.1:" + UDP_SEND_PORT;
+      String remoteSend = "[" + remoteYggIp + "]:" + remotePort;
+      try {
+        YggdrasilManager.removeLocalUDPMapping(localSend, remoteSend);
+      } catch (Exception e) {
+        Log.w(TAG, "removeLocalUDPMapping error", e);
+      }
+      try {
+        YggdrasilManager.removeRemoteUDPMapping(UDP_RECV_PORT, "127.0.0.1:" + UDP_RECV_PORT);
+      } catch (Exception e) {
+        Log.w(TAG, "removeRemoteUDPMapping error", e);
+      }
+
       releaseCodec();
+      release();
+
       promise.resolve(true);
     } catch (Exception e) {
-      Log.e(TAG, "stopCodec error", e);
-      promise.reject("OPUS_STOP_ERROR", e.getMessage(), e);
+      Log.e(TAG, "stopUdpAudio error", e);
+      promise.reject("STOP_UDP_ERROR", e.getMessage(), e);
     }
   }
 
-  @ReactMethod
-  public void addListener(String eventName) {}
-
-  @ReactMethod
-  public void removeListeners(int count) {}
+  private void udpReceiveLoop() {
+    byte[] buf = new byte[4000];
+    DatagramPacket pkt = new DatagramPacket(buf, buf.length);
+    while (udpRunning) {
+      try {
+        recvSocket.receive(pkt);
+        int pcmLen = OpusBridge.nativeDecoderDecode(
+          opusDecoder, pkt.getData(), pkt.getLength(), decodeBuf);
+        if (pcmLen > 0) {
+          audioTrack.write(decodeBuf, 0, pcmLen);
+        }
+      } catch (java.net.SocketException e) {
+        break;
+      } catch (Exception e) {
+        if (udpRunning) {
+          Log.w(TAG, "UDP receive error", e);
+        }
+      }
+    }
+  }
 
   private void releaseCodec() {
     if (opusEncoder != 0) {
@@ -251,14 +245,6 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
       bytes[i] = (byte) arr.getInt(i);
     }
     return bytes;
-  }
-
-  private WritableArray toWritableArray(byte[] buf, int len) {
-    WritableArray arr = Arguments.createArray();
-    for (int i = 0; i < len; i++) {
-      arr.pushInt(buf[i] & 0xFF);
-    }
-    return arr;
   }
 
   private void release() {

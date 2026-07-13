@@ -21,12 +21,10 @@
   (reset! rdb/app-db app-db))
 
 (rf/reg-fx :voip/send-signal (mock-fx :voip/send-signal))
-(rf/reg-fx :voip/send-audio (mock-fx :voip/send-audio))
 (rf/reg-fx :voip/connect-audio (mock-fx :voip/connect-audio))
 (rf/reg-fx :voip/disconnect-audio (mock-fx :voip/disconnect-audio))
 (rf/reg-fx :voip/start-capture (mock-fx :voip/start-capture))
 (rf/reg-fx :voip/stop-capture (mock-fx :voip/stop-capture))
-(rf/reg-fx :voip/play-audio (mock-fx :voip/play-audio))
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
@@ -236,55 +234,4 @@
     (is (contains? @captured :voip/disconnect-audio))
     (is (contains? @captured :voip/stop-capture))))
 
-(deftest test-incoming-audio
-  (let [opus-data (js/Uint8Array. #js [0x42 0x43 0x44])
-        seq-num 0
-        msg {:seq seq-num
-             :data opus-data}]
-    (reset! rdb/app-db (-> app-db
-                           (assoc-in [:voip :call-state] :connected)
-                           (assoc-in [:voip :call-id] "call-id")))
-    (rf/dispatch-sync [:voip/incoming-audio msg])
-    (let [audio-opts (get @captured :voip/play-audio)]
-      (is (map? audio-opts))
-      (is (= opus-data (:data audio-opts)))))
-  (testing "audio while idle is ignored"
-    (setup)
-    (let [opus-data (js/Uint8Array. #js [0x42 0x43])
-          msg {:seq 0 :data opus-data}]
-      (reset! rdb/app-db (assoc-in app-db [:voip :call-state] :idle))
-      (rf/dispatch-sync [:voip/incoming-audio msg])
-      (is (not (contains? @captured :voip/play-audio))))))
 
-(deftest test-audio-chunk-captured-raw-data
-  (let [opus-chunk (js/Uint8Array. #js [0x42 0x43 0x44])
-        db-connected (-> app-db
-                         (assoc-in [:voip :call-state] :connected)
-                         (assoc-in [:voip :call-id] "call-1")
-                         (assoc-in [:voip :audio-seq] 5))]
-    (reset! rdb/app-db db-connected)
-    (rf/dispatch-sync [:voip/audio-chunk-captured opus-chunk])
-    (let [audio-send (get @captured :voip/send-audio)]
-      (is (map? audio-send))
-      (is (= opus-chunk (:data audio-send)))
-      (is (= 5 (:seq audio-send))))
-    (is (= 6 (get-in @rdb/app-db [:voip :audio-seq])))))
-
-(deftest test-audio-chunk-captured-increments-seq
-  (let [db-connected (-> app-db
-                         (assoc-in [:voip :call-state] :connected)
-                         (assoc-in [:voip :call-id] "call-1")
-                         (assoc-in [:voip :audio-seq] 0))]
-    (reset! rdb/app-db db-connected)
-    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [0x42])])
-    (is (= 1 (get-in @rdb/app-db [:voip :audio-seq])))
-    (is (= 0 (:seq (get @captured :voip/send-audio)))
-        "first chunk gets seq 0")
-    (rf/dispatch-sync [:voip/audio-chunk-captured (js/Uint8Array. #js [0x43])])
-    (is (= 2 (get-in @rdb/app-db [:voip :audio-seq])))))
-
-(deftest test-audio-chunk-captured-idle
-  (let [opus-chunk (js/Uint8Array. #js [0x42 0x43])]
-    (reset! rdb/app-db (assoc-in app-db [:voip :call-state] :idle))
-    (rf/dispatch-sync [:voip/audio-chunk-captured opus-chunk])
-    (is (not (contains? @captured :voip/send-audio)))))
