@@ -25,7 +25,7 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 
 - **P2P Messaging** — Send and receive messages directly between devices over the Yggdrasil mesh (messages are ephemeral — only last 5 messages persisted across app restart)
 - **Ed25519 Signing** — All messages are signed with tweetnacl detached signatures; unknown senders auto-create contacts; public key mismatch detection prevents impersonation
-- **Audio Calls** — Full peer-to-peer audio calls: Ed25519-signed signaling (offer/accept/reject/end), 16kHz PCM audio captured via expo-audio, binary audio frames over SOCKS5 through Yggdrasil to port 7778
+- **Audio Calls** — Full peer-to-peer audio calls: Ed25519-signed signaling (offer/accept/reject/end), Opus-encoded audio over UDP through Yggdrasil (24kHz PCM via native Android `AudioTrackModule`)
 - **Contact Management** — Add contacts by Yggdrasil IPv6 address; contacts persisted via expo-secure-store; unread message count badges; message resend on failure
 - **Cryptographic Identity** — Ed25519 keypair generated on-device (via yggstack Go bindings); identity (private key) persisted via expo-secure-store (Android Keystore); ability to regenerate identity
 - **Background Operation** — Android foreground service (`YggdrasilService.java`) keeps the messenger running to receive messages and calls
@@ -42,17 +42,17 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 
 | Layer | Technology | Role |
 |---|---|---|
-| Application Logic | [ClojureScript](https://clojurescript.org/) 1.12 | Reagent + re-frame |
-| UI Framework | [Reagent](https://reagent-project.github.io/) 2.0.1 | Declarative React Native components |
-| State Management | [re-frame](https://github.com/Day8/re-frame) 1.4.7 | Event-driven state |
-| CLJS Build | [shadow-cljs](https://shadow-cljs.github.io/) 3.4.11 | Hot-reload, nREPL, release builds |
-| Mobile Shell | [React Native](https://reactnative.dev/) 0.86 + [Expo](https://expo.io/) SDK 57 | Cross-platform runtime |
-| Navigation | [React Navigation](https://reactnavigation.org/) 7 | Screen navigation |
-| Crypto | [tweetnacl](https://tweetnacl.js.org/) 1.0.3 | Ed25519 signing/verification |
-| Network | [yggstack](https://github.com/DrewCyber/yggstack) (Go/gomobile AAR) | Yggdrasil node + SOCKS5 proxy |
-| Audio Calls | [expo-audio](https://docs.expo.dev/versions/latest/sdk/audio/) | 16kHz PCM capture + native playback |
-| TCP Sockets | [react-native-tcp-socket](https://github.com/aprock/react-native-tcp-socket) | SOCKS5 client + TCP/audio servers |
-| Connectivity | [@react-native-community/netinfo](https://github.com/react-native-netinfo/react-native-netinfo) | Network state monitoring |
+| Application Logic | ClojureScript 1.12 | Reagent + re-frame |
+| UI Framework | Reagent 2.0.1 | Declarative React Native components |
+| State Management | re-frame 1.4.7 | Event-driven state |
+| CLJS Build | shadow-cljs 3.4.11 | Hot-reload, nREPL, release builds |
+| Mobile Shell | React Native 0.86 + Expo SDK 57 | Cross-platform runtime |
+| Navigation | React Navigation 7 | Screen navigation |
+| Crypto | tweetnacl 1.0.3 | Ed25519 signing/verification |
+| Network | yggstack (Go/gomobile AAR) | Yggdrasil node + SOCKS5 proxy |
+| Audio Calls | expo-audio + Java native AudioTrackModule (Opus/NDK) | Permission requesting + Opus/UDP audio |
+| TCP Sockets | react-native-tcp-socket | SOCKS5 client + TCP message server |
+| Connectivity | @react-native-community/netinfo | Network state monitoring |
 | Secure Storage | expo-secure-store | Key/contacts persistence (Android Keystore) |
 | Notifications | expo-notifications | Incoming message/call alerts |
 | Clipboard | expo-clipboard | Copy IPv6 address |
@@ -66,7 +66,7 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  ┌──────────────────┐ │
 │  │ re-frame │  │  Reagent │  │  VoIP        │  │  CLJS Bridge     │ │
 │  │ events/  │  │  Views   │  │  voip.cljs   │  │  yggstack.cljs   │ │
-│  │ subs     │  │          │  │  voip_conn   │  │  messenger.cljs  │ │
+│  │ subs     │  │          │  │             │  │  messenger.cljs  │ │
 │  └────┬─────┘  └──────────┘  └──────┬───────┘  └─────-──┬─────────┘ │
 │       │                             │                   │           │
 ├───────┼─────────────────────────────┼───────────────────┼───────────┤
@@ -75,7 +75,7 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 │       │    │  Native Modules (Java)                             │   │
 │       │    │  YggstackModule.java — JNI to Go bindings          │   │
 │       │    │  YggdrasilService.java — foreground service        │   │
-│       │    │  AudioTrackModule.java — PCM audio playback        │   │
+│       │    │  AudioTrackModule.java — Opus/UDP audio            │   │
 │       │    │  YggdrasilManager.java — singleton core manager    │   │
 │       │    └─────────────────────┬──────────────────────────────┘   │
 ├───────┼──────────────────────────┼──────────────────────────────────┤
@@ -84,19 +84,19 @@ Built with **ClojureScript** (Reagent + re-frame) on React Native/Expo, with a *
 │       │ │  yggstack.aar (gomobile Go bindings)                  │   │
 │       │ │  - Yggdrasil P2P node                                 │   │
 │       │ │  - SOCKS5 proxy (127.0.0.1:1080)                      │   │
-│       │ │  - Remote TCP port forwarding                         │   │
+│       │ │  - Remote TCP/UDP port forwarding                     │   │
 │       │ └────────────────────────────────────────────────────-──┘   │
 └───────┴─────────────────────────────────────────────────────-───────┘
 ```
 
-### Two TCP Servers
+### Network Ports
 
-| Port | Server | Purpose |
-|---|---|---|
-| 7777 | `tcp_server.cljs` | Receives EDN-encoded messages and call signals from the mesh |
-| 7778 | `audio_server.cljs` | Receives binary audio frames (PCM) during active calls |
+| Port | Protocol | Component | Purpose |
+|---|---|---|---|
+| 7777 | TCP | `tcp_server.cljs` | Receives EDN-encoded messages and call signals from the mesh |
+| 7778 | UDP | Java `AudioTrackModule` | Receives Opus-encoded audio frames during active calls |
 
-Both are exposed via Yggdrasil remote TCP port forwarding and accessed by peers through the SOCKS5 proxy.
+Port 7777 is exposed via Yggdrasil remote TCP port forwarding. Port 7778 uses Yggdrasil UDP remote port forwarding for low-latency audio.
 
 ## Message Protocol
 
@@ -125,23 +125,13 @@ Call signals carry additional fields:
  :sig       "base64-string"}  ;; signed over call-signal|call-type|call-id|ts
 ```
 
-Audio frames use a binary protocol on port 7778:
-
-```
-┌─────────┬─────────┬──────────────────┐
-│4-byte BE│4-byte BE│    PCM data      │
-│payload  │sequence │  (variable len)  │
-│length   │number   │   (int16 mono)   │
-└─────────┴─────────┴──────────────────┘
-```
-
-Audio is captured at 16 kHz, 16-bit signed PCM (mono) via expo-audio, and played back through native `AudioTrackModule.java`.
+Audio is handled entirely by the Java native `AudioTrackModule`. It captures at 24 kHz, 16-bit signed PCM (mono) via Android `AudioRecord`, encodes with Opus via JNI, and sends Opus frames over UDP through Yggdrasil. The receiving side decodes Opus and plays back via Android `AudioTrack`. `expo-audio` is only used for permission requesting.
 
 ## Prerequisites
 
 - **Java** 11+ (for shadow-cljs)
 - **Node.js** 18+ and npm
-- **Android SDK** (API 24+) and NDK — via [Android command-line tools](https://developer.android.com/tools) or Android Studio
+- **Android SDK** (API 24+) and NDK — via Android command-line tools or Android Studio
 - **Go** 1.20+ (only if rebuilding the yggstack AAR; ensure `$(go env GOPATH)/bin` is on your `$PATH` for `gomobile`)
 - **Clojure CLI tools** (optional, for linting/formatting)
 
