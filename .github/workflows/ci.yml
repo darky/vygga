@@ -53,8 +53,8 @@ jobs:
       - name: Setup Emscripten
         run: |
           git clone https://github.com/emscripten-core/emsdk.git /tmp/emsdk
-          /tmp/emsdk/emsdk install 6.0.2
-          /tmp/emsdk/emsdk activate 6.0.2
+          /tmp/emsdk/emsdk install 3.1.73
+          /tmp/emsdk/emsdk activate 3.1.73
           echo "/tmp/emsdk/upstream/emscripten" >> $GITHUB_PATH
 
       - run: npm ci
