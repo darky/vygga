@@ -36,13 +36,23 @@ function withModuleSources(config) {
       if (!fs.existsSync(srcDir)) fs.mkdirSync(srcDir, { recursive: true });
 
       const javaFiles = fs.readdirSync(JAVA_SRC)
-        .filter(f => f.endsWith('.java') && f.startsWith('AudioTrack'));
+        .filter(f => f.endsWith('.java'));
       for (const file of javaFiles) {
         const code = fs.readFileSync(path.join(JAVA_SRC, file), 'utf8');
         const dest = path.join(srcDir, file);
         if (file === 'AudioTrackPackage.java' && fs.existsSync(dest)) continue;
         fs.writeFileSync(dest, code, 'utf8');
         console.log('[withAudioTrack] Created ' + file);
+      }
+
+      const jniSrc = path.join(JAVA_SRC, 'jniLibs');
+      const jniDst = path.join(
+        cfg.modRequest.platformProjectRoot,
+        'app', 'src', 'main', 'jniLibs'
+      );
+      if (fs.existsSync(jniSrc)) {
+        copyRecursiveSync(jniSrc, jniDst);
+        console.log('[withAudioTrack] Copied jniLibs');
       }
 
       return cfg;
@@ -102,6 +112,20 @@ function withPermissions(config) {
     manifest.manifest['uses-permission'] = perms;
     return cfg;
   });
+}
+
+function copyRecursiveSync(src, dest) {
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyRecursiveSync(s, d);
+    } else {
+      fs.copyFileSync(s, d);
+    }
+  }
 }
 
 function withAudioTrack(config) {

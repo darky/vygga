@@ -7,10 +7,9 @@
     "web": "npx expo start --web",
     "web-only": "npx expo start --web-only",
     "release": "npx shadow-cljs release app",
-    "opus-wasm": "rm -f src/main/vygga/opus_enc.js app/opus_enc.js && cd vendor/opus && emmake make -f Makefile.wasm",
     "eject": "npx expo eject",
     "test": "npx shadow-cljs compile test && node --require ./test/support/preload.js out/test/test.js",
-    "eas-build-post-install": "npm run opus-wasm && npx shadow-cljs release app"
+    "eas-build-post-install": "npx shadow-cljs release app"
   },
   "dependencies": {
     "@react-native-community/netinfo": "^12.0.1",
