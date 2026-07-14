@@ -206,7 +206,12 @@
                  [:> rn/View {:style {:width 8 :height 8 :border-radius 4
                                       :background-color level-color :margin-right 6}}])
                [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t) :font-family :monospace}}
-                (.slice (.toISOString (js/Date. (:ts e))) 11 23)]]
+                (.slice (.toISOString (js/Date. (:ts e))) 11 23)]
+               (when (= (:source e) :re-frame)
+                 [:> rn/Text {:style {:font-size 10 :font-weight :bold
+                                      :color (:accent t) :margin-left 6
+                                      :font-family :monospace}}
+                  "[RF]"])]
               [:> rn/Text {:style {:font-size 13 :color (:text-primary t)
                                    :font-family :monospace :margin-left 14}}
                (:msg e)]]))))]]))

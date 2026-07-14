@@ -12,6 +12,21 @@
                                         :level level
                                         :msg msg}])))
 
+(defn patch-re-frame! []
+  (rf/reg-global-interceptor
+   (rf/->interceptor
+    :id :re-frame-debug-logger
+    :after (fn [context]
+             (let [event (get-in context [:coeffects :event])
+                   event-id (first event)]
+               (when-not (= (namespace event-id) "debug-log")
+                 (rf/dispatch [:debug-log/add-entry
+                               {:ts (.now js/Date)
+                                :level :info
+                                :msg (str "→ " (pr-str event))
+                                :source :re-frame}])))
+             context))))
+
 (defn patch-console! []
   (reset! original-log js/console.log)
   (reset! original-warn js/console.warn)

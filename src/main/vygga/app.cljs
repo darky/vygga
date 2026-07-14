@@ -17,5 +17,6 @@
 (defn init []
   (rf/dispatch-sync [:initialize-db])
   (when config/log-enabled
-    (logging/patch-console!))
+    (logging/patch-console!)
+    (logging/patch-re-frame!))
   (start))
