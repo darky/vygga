@@ -25,3 +25,9 @@
   (rf/reg-fx :messenger/send-via-socks (mock-fx :messenger/send-via-socks))
   (rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
   (rf/reg-fx :messenger/save-contacts (mock-fx :messenger/save-contacts)))
+
+(defn text-in-tree [root]
+  (filter string? (tree-seq vector? seq root)))
+
+(defn text-present? [root s]
+  (some #(= s %) (text-in-tree root)))

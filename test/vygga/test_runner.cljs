@@ -6,7 +6,13 @@
    [vygga.yggstack-test]
    [vygga.events-test]
    [vygga.subs-test]
-   [vygga.view-test]
+   [vygga.view.yggstatus-test]
+   [vygga.view.settings-test]
+   [vygga.view.contacts-test]
+   [vygga.view.chat-test]
+   [vygga.view.navigation-test]
+   [vygga.view.calls-test]
+   [vygga.view.debug-test]
    [vygga.widgets-test]
    [vygga.storage-test]
    [vygga.messenger-test]
@@ -23,7 +29,13 @@
    'vygga.yggstack-test
    'vygga.events-test
    'vygga.subs-test
-   'vygga.view-test
+   'vygga.view.yggstatus-test
+   'vygga.view.settings-test
+   'vygga.view.contacts-test
+   'vygga.view.chat-test
+   'vygga.view.navigation-test
+   'vygga.view.calls-test
+   'vygga.view.debug-test
    'vygga.widgets-test
    'vygga.storage-test
    'vygga.messenger-test
