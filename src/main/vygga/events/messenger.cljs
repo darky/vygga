@@ -118,18 +118,18 @@
          msg {:text text :from-me true
               :id msg-id :ts ts
               :status :sending}]
-      (if (and address text (seq text))
-        {:db (update-in db [:messenger :contacts contact-id] mu/add-message msg)
-         :messenger/send-via-socks {:address address
-                                    :my-address my-address
-                                    :private-key private-key
-                                    :public-key public-key
-                                    :contact-id contact-id
-                                    :text text
-                                    :msg-id msg-id
-                                    :ts ts}
-         :messenger/save-contacts nil}
-        (js/console.warn "Cannot send: missing address or text")))))
+     (if (and address text (seq text))
+       {:db (update-in db [:messenger :contacts contact-id] mu/add-message msg)
+        :messenger/send-via-socks {:address address
+                                   :my-address my-address
+                                   :private-key private-key
+                                   :public-key public-key
+                                   :contact-id contact-id
+                                   :text text
+                                   :msg-id msg-id
+                                   :ts ts}
+        :messenger/save-contacts nil}
+       (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx
  :messenger/send-via-socks
@@ -205,16 +205,16 @@
                         :id id :ts ts}]
            (if pubkey-mismatch
              (js/console.warn "Public key mismatch for" from-addr)
-              (if existing
-                (let [viewing? (= from-addr current-contact)]
-                  {:db (cond-> (-> db
-                                   (update-in [:messenger :contacts from-addr] mu/add-message new-msg)
-                                   (assoc-in [:messenger :contacts from-addr :public-key] pubkey))
-                         (not viewing?)
-                         (update-in [:messenger :contacts from-addr :unread-count] (fnil inc 0)))
-                   :messenger/save-contacts nil
-                   :messenger/show-incoming-notification {:from-addr from-addr
-                                                          :text text}})
+             (if existing
+               (let [viewing? (= from-addr current-contact)]
+                 {:db (cond-> (-> db
+                                  (update-in [:messenger :contacts from-addr] mu/add-message new-msg)
+                                  (assoc-in [:messenger :contacts from-addr :public-key] pubkey))
+                        (not viewing?)
+                        (update-in [:messenger :contacts from-addr :unread-count] (fnil inc 0)))
+                  :messenger/save-contacts nil
+                  :messenger/show-incoming-notification {:from-addr from-addr
+                                                         :text text}})
                {:db (assoc-in db [:messenger :contacts from-addr]
                               {:address from-addr
                                :public-key pubkey
