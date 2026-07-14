@@ -97,6 +97,7 @@
  (fn [{:keys [config-json socks-address nameserver]}]
    (-> (ygg/start config-json socks-address nameserver)
        (.then (fn [_]
+                (js/console.log "Yggdrasil connected")
                 (rf/dispatch [:yggstack/set-status :running])
                 (-> (ygg/get-address)
                     (.then #(rf/dispatch [:yggstack/update-address %]))
@@ -138,7 +139,9 @@
  :yggstack/stop-daemon
  (fn [_]
    (-> (ygg/stop)
-       (.then (fn [_] (rf/dispatch [:yggstack/set-status :stopped])))
+       (.then (fn [_]
+                (js/console.log "Yggdrasil disconnected")
+                (rf/dispatch [:yggstack/set-status :stopped])))
        (.catch (fn [e] (js/console.error "stop error:" e))))))
 
 (rf/reg-fx

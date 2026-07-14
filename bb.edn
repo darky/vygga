@@ -7,10 +7,12 @@
          fix-format   {:doc "Fix Clojure formatting"
                        :requires ([cljfmt.tool :as fmt])
                        :task (fmt/fix {:paths ["src/main"]})}
-         check-unused-vars {:doc "Check for unused vars (dry-run)"
-                            :requires ([carve.api :as carve])
-                            :task (carve/carve! {:paths ["src/main"]
-                                                 :dry-run true})}
+          check-unused-vars {:doc "Check for unused vars (exits non-zero on findings)"
+                             :requires ([carve.api :as carve])
+                             :task (let [{:keys [exit-code]} (carve/carve! {:paths ["src/main"]
+                                                                            :dry-run true})]
+                                     (when (pos? exit-code)
+                                       (throw (ex-info "Unused vars found" {}))))}
          remove-unused-vars {:doc "Interactively remove unused vars"
                              :requires ([carve.api :as carve])
                              :task (carve/carve! {:paths ["src/main"]})}}}

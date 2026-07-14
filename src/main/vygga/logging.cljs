@@ -1,8 +1,6 @@
 (ns vygga.logging
   (:require [re-frame.core :as rf]))
 
-(def max-entries 500)
-
 (defonce ^:private original-log (atom nil))
 (defonce ^:private original-warn (atom nil))
 (defonce ^:private original-error (atom nil))

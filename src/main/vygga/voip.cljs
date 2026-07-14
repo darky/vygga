@@ -5,8 +5,6 @@
   (try (-> (js/require "react-native") .-NativeModules .-AudioTrackModule)
        (catch js/Error _ nil)))
 
-(def ^:const sample-rate 24000)
-
 (defn request-permissions!
   []
   (-> (.requestRecordingPermissionsAsync audio)
