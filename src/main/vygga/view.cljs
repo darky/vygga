@@ -75,6 +75,7 @@
                address (rf/subscribe [:yggstack/address])
                peer-count (rf/subscribe [:yggstack/peer-count])
                *new-peer (r/atom "")
+               *peer-ref (r/atom nil)
                pref (rf/subscribe [:theme/preferred-scheme])
                t (theme/use-theme @pref)]
     [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
@@ -146,18 +147,21 @@
            [:> rn/Text {:style {:color (:error t) :font-size 16}} "✕"]]]))
 
       [:> rn/View {:style {:flex-direction :row :align-items :center :margin-top 8 :margin-bottom 16}}
-       [:> rn/TextInput {:style {:flex 1 :border-width 1 :border-color (:border-input t)
+       [:> rn/TextInput {:key "peer-input"
+                         :style {:flex 1 :border-width 1 :border-color (:border-input t)
                                  :border-radius 8 :padding 8 :font-size 13 :margin-right 8}
                          :placeholder "tls://host:port"
                          :placeholder-text-color (:text-tertiary t)
-                         :value @*new-peer
+                         :default-value ""
+                         :ref #(reset! *peer-ref %)
                          :on-change-text #(reset! *new-peer %)}]
        [:> rn/TouchableOpacity {:style {:background-color (:accent t) :padding 10 :border-radius 8}
                                 :on-press (fn []
                                             (let [uri @*new-peer]
                                               (when (seq uri)
-                                                (rf/dispatch [:yggstack/add-peer uri])
-                                                (reset! *new-peer ""))))}
+                                                (rf/dispatch [:yggstack/add-peer uri]))
+                                              (reset! *new-peer "")
+                                              (when-let [r @*peer-ref] (.clear r))))}
         [:> rn/Text {:style {:color (:text-inverse t) :font-weight :600}} "Add"]]]]
 
      (when config/log-enabled
@@ -257,6 +261,7 @@
   (r/with-let [sorted-contacts (rf/subscribe [:messenger/sorted-contacts])
                *show-add (r/atom false)
                *new-addr (r/atom "")
+               *addr-ref (r/atom nil)
                pref (rf/subscribe [:theme/preferred-scheme])
                t (theme/use-theme @pref)]
     [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
@@ -284,12 +289,14 @@
                              :padding 24 :width "85%"}}
          [:> rn/Text {:style {:font-size 20 :font-weight :bold :margin-bottom 16 :color (:text-primary t)}}
           "Add Contact"]
-         [:> rn/TextInput {:style {:border-width 1 :border-color (:border-input-alt t)
+         [:> rn/TextInput {:key "add-contact-input"
+                           :style {:border-width 1 :border-color (:border-input-alt t)
                                    :border-radius 8 :padding 12 :font-size 15
                                    :margin-bottom 20 :color (:text-primary t)}
                            :placeholder "Yggdrasil IPv6 (e.g. 201:1234::1)"
                            :placeholder-text-color (:text-tertiary t)
-                           :value @*new-addr
+                           :default-value ""
+                           :ref #(reset! *addr-ref %)
                            :on-change-text #(reset! *new-addr %)}]
          [:> rn/View {:style {:flex-direction :row :justify-content :flex-end}}
           [:> rn/Pressable {:on-press #(reset! *show-add false)
@@ -304,7 +311,8 @@
                                             (rf/dispatch [:messenger/add-contact
                                                           {:address addr}]))
                                           (reset! *new-addr "")
-                                          (reset! *show-add false)))}
+                                          (reset! *show-add false)
+                                          (when-let [r @*addr-ref] (.clear r))))}
            [:> rn/Text {:style {:color (:text-inverse t) :font-weight :600}} "Add"]]]]])
      [:> StatusBar {:style "auto"}]]))
 
