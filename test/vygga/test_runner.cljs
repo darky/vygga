@@ -4,7 +4,13 @@
    [vygga.crypto-test]
    [vygga.core-test]
    [vygga.yggstack-test]
-   [vygga.events-test]
+   [vygga.events.theme-test]
+   [vygga.events.navigation-test]
+   [vygga.events.app-test]
+   [vygga.events.yggstack-test]
+   [vygga.events.messenger-test]
+   [vygga.events.voip-test]
+   [vygga.events.debug-test]
    [vygga.subs-test]
    [vygga.view.yggstatus-test]
    [vygga.view.settings-test]
@@ -18,7 +24,6 @@
    [vygga.messenger-test]
    [vygga.tcp-server-test]
    [vygga.tcp-client-test]
-   [vygga.voip-test]
    [vygga.audio-server-test]
    [vygga.voip-connection-test]))
 
@@ -27,7 +32,13 @@
    'vygga.crypto-test
    'vygga.core-test
    'vygga.yggstack-test
-   'vygga.events-test
+   'vygga.events.theme-test
+   'vygga.events.navigation-test
+   'vygga.events.app-test
+   'vygga.events.yggstack-test
+   'vygga.events.messenger-test
+   'vygga.events.voip-test
+   'vygga.events.debug-test
    'vygga.subs-test
    'vygga.view.yggstatus-test
    'vygga.view.settings-test
@@ -41,6 +52,5 @@
    'vygga.messenger-test
    'vygga.tcp-server-test
    'vygga.tcp-client-test
-   'vygga.voip-test
    'vygga.audio-server-test
    'vygga.voip-connection-test))

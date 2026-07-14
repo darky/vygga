@@ -3,7 +3,7 @@
    [cljs.test :as t :refer-macros [deftest is use-fixtures]]
    [re-frame.db :as rdb]
    [vygga.tcp-server :as tcp-server]
-   [vygga.events]
+    [vygga.events.messenger]
    [vygga.crypto :as crypto]
    [vygga.db :refer [app-db]]))
 

@@ -1,5 +1,5 @@
 (ns vygga.view.navigation
-  (:require [vygga.events]
+  (:require [vygga.events.navigation]
             [vygga.subs]
             [vygga.config :as config]
             [vygga.theme :as theme]

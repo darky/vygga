@@ -1,11 +1,11 @@
-(ns vygga.voip-test
+(ns vygga.events.voip-test
   (:require
    [cljs.test :refer-macros [deftest is testing use-fixtures]]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
    [vygga.db :refer [app-db]]
    [vygga.crypto :as crypto]
-   [vygga.events]))
+   [vygga.events.voip]))
 
 (def captured (atom {}))
 
@@ -18,11 +18,11 @@
 
 (defn setup []
   (reset! captured {})
-  (reset! rdb/app-db app-db))
-
-(rf/reg-fx :voip/send-signal (mock-fx :voip/send-signal))
-(rf/reg-fx :voip/connect-audio (mock-fx :voip/connect-audio))
-(rf/reg-fx :voip/disconnect-audio (mock-fx :voip/disconnect-audio))
+  (reset! rdb/app-db app-db)
+  (rf/reg-fx :messenger/show-incoming-notification (mock-fx :messenger/show-incoming-notification))
+  (rf/reg-fx :voip/send-signal (mock-fx :voip/send-signal))
+  (rf/reg-fx :voip/connect-audio (mock-fx :voip/connect-audio))
+  (rf/reg-fx :voip/disconnect-audio (mock-fx :voip/disconnect-audio)))
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
@@ -226,5 +226,3 @@
     (rf/dispatch-sync [:voip/incoming-signal msg])
     (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
     (is (contains? @captured :voip/disconnect-audio))))
-
-

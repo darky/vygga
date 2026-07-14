@@ -1,6 +1,7 @@
 (ns vygga.network
   (:require ["@react-native-community/netinfo" :as netinfo]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            [vygga.events.yggstack]))
 
 (defn handle-network-change
   [prev-connected state]

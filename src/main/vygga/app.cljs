@@ -1,5 +1,7 @@
 (ns vygga.app
-  (:require [vygga.events]
+  (:require [vygga.events.app]
+            [vygga.events.yggstack]
+            [vygga.events.messenger]
             [vygga.subs]
             [vygga.network]
             [vygga.config :as config]

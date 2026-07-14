@@ -1,5 +1,7 @@
 (ns vygga.view.settings
-  (:require [vygga.events]
+  (:require [vygga.events.theme]
+            [vygga.events.yggstack]
+            [vygga.events.app]
             [vygga.subs]
             [vygga.config :as config]
             [vygga.theme :as theme]

@@ -3,7 +3,7 @@
    [cljs.test :refer-macros [deftest is use-fixtures]]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
-   [vygga.events]
+    [vygga.events.navigation]
    [vygga.subs]
    [vygga.view.navigation :as nav-view]
    [vygga.view-test-utils :refer [setup-view-tests]]))

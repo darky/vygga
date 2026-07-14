@@ -3,7 +3,7 @@
    [cljs.test :refer-macros [deftest is use-fixtures]]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
-   [vygga.events]
+    [vygga.events.messenger]
    [vygga.subs]
    [vygga.view.chat :as chat-view]
    [vygga.theme :as theme]
