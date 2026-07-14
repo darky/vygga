@@ -601,6 +601,20 @@
  :voip/stop-capture
  (fn [_]))
 
+(rf/reg-event-db
+ :debug-log/add-entry
+ (fn [db [_ entry]]
+   (let [logs (get-in db [:debug :logs] [])
+         new-logs (conj logs entry)]
+     (if (> (count new-logs) 500)
+       (assoc-in db [:debug :logs] (subvec new-logs 1))
+       (assoc-in db [:debug :logs] new-logs)))))
+
+(rf/reg-event-db
+ :debug-log/clear
+ (fn [db _]
+   (assoc-in db [:debug :logs] [])))
+
 (rf/reg-event-fx
  :messenger/receive-incoming
  (fn [{db :db} [_ from-addr text id ts pubkey sig]]

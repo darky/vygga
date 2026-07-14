@@ -57,6 +57,11 @@
    (:preferred-scheme db)))
 
 (rf/reg-sub
+ :debug-log/entries
+ (fn [db _]
+   (get-in db [:debug :logs])))
+
+(rf/reg-sub
  :messenger/sorted-contacts
  (fn [db _]
    (->> (get-in db [:messenger :contacts])

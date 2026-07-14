@@ -9,6 +9,11 @@
                       :output-dir       "app"
                       :compiler-options {:infer-externs :auto}
                       :devtools         {:autoload true}}
-                :test {:target          :node-test
-                       :output-to       "out/test/test.js"
-                       :compiler-options {:infer-externs :auto}}}}
+                 :app-debug-log {:target           :react-native
+                                :init-fn          vygga.app/init
+                                :output-dir       "app"
+                                :compiler-options {:infer-externs :auto}
+                                :closure-defines  {vygga.config/log-enabled true}}
+                 :test          {:target          :node-test
+                                 :output-to       "out/test/test.js"
+                                 :compiler-options {:infer-externs :auto}}}}

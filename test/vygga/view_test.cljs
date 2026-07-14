@@ -154,7 +154,7 @@
     (is (some? result))))
 
 (deftest test-settings-smoke
-  (let [result (view/settings)]
+  (let [result (view/settings #js {:navigation #js {:navigate (fn [])}})]
     (is (some? result))))
 
 (deftest test-contacts-smoke

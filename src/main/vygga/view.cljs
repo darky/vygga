@@ -1,6 +1,7 @@
 (ns vygga.view
   (:require [vygga.events]
             [vygga.subs]
+            [vygga.config :as config]
             [vygga.theme :as theme]
             [vygga.widgets :refer [button]]
             ["expo-status-bar" :refer [StatusBar]]
@@ -68,7 +69,7 @@
            [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t)}} (subs addr 0 15)]
            [:> Ionicons {:name "copy-outline" :size 12 :color (:text-tertiary t) :margin-left 4}]])]])))
 
-(defn settings []
+(defn settings [props]
   (r/with-let [status (rf/subscribe [:yggstack/status])
                peers (rf/subscribe [:yggstack/peers])
                address (rf/subscribe [:yggstack/address])
@@ -159,7 +160,56 @@
                                                 (reset! *new-peer ""))))}
         [:> rn/Text {:style {:color (:text-inverse t) :font-weight :600}} "Add"]]]]
 
+     (when config/log-enabled
+       [:> rn/View {:style {:border-top-width 1 :border-top-color (:border t) :padding-top 16
+                            :margin-bottom 16}}
+        [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
+         "Debug"]
+        [button {:on-press #(-> props .-navigation (.navigate "Debug"))
+                 :style {:background-color (:accent t)}}
+         "Open Debug Logs"]])
+
      [:> StatusBar {:style "auto"}]]))
+
+;; ---- Debug Log Screen ----
+
+(defn debug-screen []
+  (r/with-let [logs (rf/subscribe [:debug-log/entries])
+               pref (rf/subscribe [:theme/preferred-scheme])
+               t (theme/use-theme @pref)]
+    [:> rn/View {:style {:flex 1 :background-color (:bg t)}}
+     [:> rn/View {:style {:flex-direction :row :justify-content :space-between
+                          :align-items :center :padding 16
+                          :border-bottom-width 1 :border-bottom-color (:border t)}}
+      [:> rn/Text {:style {:font-size 18 :font-weight :bold :color (:text-primary t)}}
+       "Debug Logs"]
+      [button {:on-press #(rf/dispatch [:debug-log/clear])
+               :style {:background-color (:error t) :margin-bottom 0}}
+       "Clear"]]
+     [:> rn/ScrollView {:style {:flex 1 :padding 12}}
+      (let [entries @logs]
+        (if (empty? entries)
+          [:> rn/Text {:style {:padding 20 :text-align :center :color (:empty-text t)}}
+           "No log entries"]
+          (doall
+           (for [e (rseq entries)]
+             [:> rn/View {:key (str (:ts e))
+                          :style {:padding-vertical 4
+                                  :border-bottom-width 1
+                                  :border-bottom-color (:border-light t)}}
+              [:> rn/View {:style {:flex-direction :row :align-items :center :margin-bottom 2}}
+               (let [level-color (case (:level e)
+                                   :error (:error t)
+                                   :warn (:warning t)
+                                   :info (:accent t)
+                                   (:text-tertiary t))]
+                 [:> rn/View {:style {:width 8 :height 8 :border-radius 4
+                                      :background-color level-color :margin-right 6}}])
+               [:> rn/Text {:style {:font-size 11 :color (:text-tertiary t) :font-family :monospace}}
+                (.slice (.toISOString (js/Date. (:ts e))) 11 23)]]
+              [:> rn/Text {:style {:font-size 13 :color (:text-primary t)
+                                   :font-family :monospace :margin-left 14}}
+               (:msg e)]]))))]]))
 
 ;; ---- Contact List Screen ----
 
@@ -475,7 +525,11 @@
                          :options {:title "Chat"}}]
        [:> Stack.Screen {:name "Settings"
                          :component (fn [props] (r/as-element [settings props]))
-                         :options {:title "Yggdrasil Settings"}}]]]
+                         :options {:title "Yggdrasil Settings"}}]
+       (when config/log-enabled
+         [:> Stack.Screen {:name "Debug"
+                           :component (fn [_] (r/as-element [debug-screen]))
+                           :options {:title "Debug Logs"}}])]]
      [incoming-call-overlay {:t t}]
      [:> rn/View {:style {:position :absolute :left 0 :right 0 :bottom 0 :z-index 50}}
       [active-call-bar {:t t}]]]))

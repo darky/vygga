@@ -18,6 +18,7 @@
                              :server-running false
                              :contacts {}
                              :current-contact nil}
+                 :debug {:logs []}
                  :voip {:call-state :idle
                         :call-id nil
                         :remote-addr nil
