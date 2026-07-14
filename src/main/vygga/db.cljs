@@ -3,7 +3,7 @@
 (defonce default-peers
   ["tls://45.95.202.21:443"
    "tls://box.paulll.cc:13338"
-   "tls://91.98.161.68:9001?key=0e638944bfd6b277fa5e0dddbeb4444778eea8bece63a9862c661797022a8f05"
+   "tls://des.8px.sk:4321"
    "tls://95.217.35.92:1337"])
 
 (defonce app-db {:preferred-scheme :dark
