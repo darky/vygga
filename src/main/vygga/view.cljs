@@ -149,7 +149,8 @@
       [:> rn/View {:style {:flex-direction :row :align-items :center :margin-top 8 :margin-bottom 16}}
        [:> rn/TextInput {:key "peer-input"
                          :style {:flex 1 :border-width 1 :border-color (:border-input t)
-                                 :border-radius 8 :padding 8 :font-size 13 :margin-right 8}
+                                 :border-radius 8 :padding 8 :font-size 13 :margin-right 8
+                                 :color (:text-primary t)}
                          :placeholder "tls://host:port"
                          :placeholder-text-color (:text-tertiary t)
                          :default-value ""
