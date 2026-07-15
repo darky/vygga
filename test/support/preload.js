@@ -18,6 +18,7 @@ var stubModules = {
   'react-native-tcp-socket': true,
   'expo-audio': true,
   '@react-native-community/netinfo': true,
+  'expo-keep-awake': true,
 };
 
 Module._resolveFilename = function(request, parent) {

@@ -25,6 +25,7 @@
       "./plugins/withYggstack",
       "./plugins/withNotificationSound",
       "./plugins/withAudioTrack",
+      "./plugins/withWifiLock",
       "expo-secure-store"
     ],
     "android": {

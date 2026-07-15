@@ -94,6 +94,27 @@ compound as conversations grow. Follow these principles:
    collections. Use seqs when you only need to walk forward; use vectors
    only when you need random access by index.
 
+## Domain-Driven Design: One Concern, One File
+
+Name files after the domain concept they own, and keep unrelated concerns
+in separate files. A file should be understandable on its own.
+
+1. **File equals domain.** `events/powermanager.cljs` owns power-management
+   effects; `events/yggstack.cljs` owns yggdrasil lifecycle. If a concern has
+   its own state, events, fx, or subs, give it its own file — no matter how
+   small.
+2. **No cross-domain wiring in the same file.** When yggstack needs to
+   acquire power locks, it fires `:powermanager/acquire` as a re-frame effect
+   key — it doesn't call `pm/acquire-all` directly or inline the logic. The
+   power domain stays in its own file; the yggstack domain expresses its
+   dependency purely through an effect contract.
+3. **Co-locate by domain, not by artifact type.** `events/powermanager.cljs`
+   is fine; `effects/powermanager.cljs` would also be fine if power only had
+   effects. Avoid splitting a single domain across `events/`, `fx/`, `subs/`
+   unless the domain is large enough to warrant it.
+4. **New domain, new file.** Adding a feature? Create a file for it. Don't
+   tack it onto an existing file that covers a different domain.
+
 ## Clojure(script) Style: Minimize Nesting
 
 Deeply nested async chains (`->` + `.then` + `fn` + `let` + `if`) cause
