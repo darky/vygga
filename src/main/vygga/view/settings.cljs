@@ -44,15 +44,6 @@
            (str "IPv6: " addr)]
           [:> Ionicons {:name "copy-outline" :size 14 :color (:text-tertiary t) :margin-left 6}]])]
 
-      [:> rn/View {:style {:background-color (:bg-card t) :padding 16 :border-radius 12 :margin-bottom 16}}
-       [:> rn/Text {:style {:font-size 18 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
-        "Appearance"]
-       [:> rn/View {:style {:flex-direction :row :align-items :center :justify-content :space-between}}
-        [:> rn/Text {:style {:font-size 16 :color (:text-primary t)}} "Dark Mode"]
-        [:> rn/Switch {:value (= @pref :dark)
-                       :on-value-change #(rf/dispatch [:theme/set-scheme (if % :dark :light)])
-                       :track-color {:true (:accent t) :false (:disabled t)}}]]]
-
       (let [s @status]
         (if (= s :running)
           [button {:on-press #(rf/dispatch [:yggstack/stop])
@@ -68,16 +59,6 @@
                   :disabled? (contains? #{:starting :stopping} @status)
                   :style {:background-color (:warning t)}}
           "Generate New Identity"]])
-
-      [:> rn/View {:style {:border-top-width 1 :border-top-color (:border t) :padding-top 16 :margin-bottom 16}}
-       [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
-        "Background Service"]
-       [button {:on-press #(rf/dispatch [:yggstack/battery-opt-out])
-                :style {:background-color (:warning t) :margin-bottom 8}}
-        "Disable Battery Optimization"]
-       [button {:on-press #(rf/dispatch [:app/exit])
-                :style {:background-color (:error t)}}
-        "Exit App"]]
 
       [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 8 :color (:text-primary t)}}
        (str "Peers (" (count @peers) ")")]
@@ -109,39 +90,58 @@
                                                 (rf/dispatch [:yggstack/add-peer uri]))
                                               (reset! *new-peer "")
                                               (when-let [r @*peer-ref] (.clear r))))}
-        [:> rn/Text {:style {:color (:text-inverse t) :font-weight :600}} "Add"]]]]
+        [:> rn/Text {:style {:color (:text-inverse t) :font-weight :600}} "Add"]]]
 
-     (when config/log-enabled
-       [:> rn/View {:style {:border-top-width 1 :border-top-color (:border t) :padding-top 16
-                            :margin-bottom 16}}
-        [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
-         "Debug"]
-        [button {:on-press #(-> props .-navigation (.navigate "Debug"))
-                 :style {:background-color (:accent t)}}
-         "Open Debug Logs"]])
+      [:> rn/View {:style {:border-top-width 1 :border-top-color (:border t) :padding-top 16 :margin-bottom 16}}
+       [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
+        "Background Service"]
+       [button {:on-press #(rf/dispatch [:yggstack/battery-opt-out])
+                :style {:background-color (:warning t) :margin-bottom 8}}
+        "Disable Battery Optimization"]
+       [button {:on-press #(rf/dispatch [:app/exit])
+                :style {:background-color (:error t)}}
+        "Exit App"]]
 
-     (when @*confirm-regenerate
-       [:> rn/View {:style {:position :absolute :top 0 :left 0 :right 0 :bottom 0
-                            :background-color (:bg-modal-overlay t)
-                            :justify-content :center :align-items :center}}
-        [:> rn/View {:style {:background-color (:bg t) :border-radius 16
-                             :padding 24 :width "85%"}}
-         [:> rn/Text {:style {:font-size 20 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
-          "Regenerate Identity"]
-         [:> rn/Text {:style {:font-size 15 :color (:text-secondary t) :margin-bottom 20
-                              :line-height 22}}
-          "This will generate a new Yggdrasil identity and restart the network. Your current identity will be lost. Are you sure?"]
-         [:> rn/View {:style {:flex-direction :row :justify-content :flex-end}}
-          [:> rn/Pressable {:on-press #(reset! *confirm-regenerate nil)
-                            :style {:padding-horizontal 16 :padding-vertical 10
-                                    :margin-right 12}}
-           [:> rn/Text {:style {:font-size 15 :color (:cancel-text t)}} "Cancel"]]
-          [:> rn/Pressable {:style {:background-color (:warning t) :padding-horizontal 20
-                                    :padding-vertical 10 :border-radius 8}
-                            :on-press (fn []
-                                        (rf/dispatch [:yggstack/generate-new-identity])
-                                        (reset! *confirm-regenerate nil))}
-           [:> rn/Text {:style {:color :white :font-weight :600}} "Regenerate"]]]]])
-     [:> StatusBar {:style "auto"}]]))
+      [:> rn/View {:style {:background-color (:bg-card t) :padding 16 :border-radius 12 :margin-bottom 16}}
+       [:> rn/Text {:style {:font-size 18 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
+        "Appearance"]
+       [:> rn/View {:style {:flex-direction :row :align-items :center :justify-content :space-between}}
+        [:> rn/Text {:style {:font-size 16 :color (:text-primary t)}} "Dark Mode"]
+        [:> rn/Switch {:value (= @pref :dark)
+                       :on-value-change #(rf/dispatch [:theme/set-scheme (if % :dark :light)])
+                       :track-color {:true (:accent t) :false (:disabled t)}}]]]
+
+      (when config/log-enabled
+        [:> rn/View {:style {:border-top-width 1 :border-top-color (:border t) :padding-top 16
+                             :margin-bottom 16}}
+         [:> rn/Text {:style {:font-size 16 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
+          "Debug"]
+         [button {:on-press #(-> props .-navigation (.navigate "Debug"))
+                  :style {:background-color (:accent t)}}
+          "Open Debug Logs"]])
+
+      (when @*confirm-regenerate
+        [:> rn/View {:style {:position :absolute :top 0 :left 0 :right 0 :bottom 0
+                             :background-color (:bg-modal-overlay t)
+                             :justify-content :center :align-items :center}}
+         [:> rn/View {:style {:background-color (:bg t) :border-radius 16
+                              :padding 24 :width "85%"}}
+          [:> rn/Text {:style {:font-size 20 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
+           "Regenerate Identity"]
+          [:> rn/Text {:style {:font-size 15 :color (:text-secondary t) :margin-bottom 20
+                               :line-height 22}}
+           "This will generate a new Yggdrasil identity and restart the network. Your current identity will be lost. Are you sure?"]
+          [:> rn/View {:style {:flex-direction :row :justify-content :flex-end}}
+           [:> rn/Pressable {:on-press #(reset! *confirm-regenerate nil)
+                             :style {:padding-horizontal 16 :padding-vertical 10
+                                     :margin-right 12}}
+            [:> rn/Text {:style {:font-size 15 :color (:cancel-text t)}} "Cancel"]]
+           [:> rn/Pressable {:style {:background-color (:warning t) :padding-horizontal 20
+                                     :padding-vertical 10 :border-radius 8}
+                             :on-press (fn []
+                                         (rf/dispatch [:yggstack/generate-new-identity])
+                                         (reset! *confirm-regenerate nil))}
+            [:> rn/Text {:style {:color :white :font-weight :600}} "Regenerate"]]]]])
+      [:> StatusBar {:style "auto"}]]]))
 
 
