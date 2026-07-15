@@ -120,28 +120,28 @@
                  :style {:background-color (:accent t)}}
          "Open Debug Logs"]])
 
-      (when @*confirm-regenerate
-        [:> rn/View {:style {:position :absolute :top 0 :left 0 :right 0 :bottom 0
-                             :background-color (:bg-modal-overlay t)
-                             :justify-content :center :align-items :center}}
-         [:> rn/View {:style {:background-color (:bg t) :border-radius 16
-                              :padding 24 :width "85%"}}
-          [:> rn/Text {:style {:font-size 20 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
-           "Regenerate Identity"]
-          [:> rn/Text {:style {:font-size 15 :color (:text-secondary t) :margin-bottom 20
-                               :line-height 22}}
-           "This will generate a new Yggdrasil identity and restart the network. Your current identity will be lost. Are you sure?"]
-          [:> rn/View {:style {:flex-direction :row :justify-content :flex-end}}
-           [:> rn/Pressable {:on-press #(reset! *confirm-regenerate nil)
-                             :style {:padding-horizontal 16 :padding-vertical 10
-                                     :margin-right 12}}
-            [:> rn/Text {:style {:font-size 15 :color (:cancel-text t)}} "Cancel"]]
-           [:> rn/Pressable {:style {:background-color (:warning t) :padding-horizontal 20
-                                     :padding-vertical 10 :border-radius 8}
-                             :on-press (fn []
-                                         (rf/dispatch [:yggstack/generate-new-identity])
-                                         (reset! *confirm-regenerate nil))}
-            [:> rn/Text {:style {:color :white :font-weight :600}} "Regenerate"]]]]])
-      [:> StatusBar {:style "auto"}]]))
+     (when @*confirm-regenerate
+       [:> rn/View {:style {:position :absolute :top 0 :left 0 :right 0 :bottom 0
+                            :background-color (:bg-modal-overlay t)
+                            :justify-content :center :align-items :center}}
+        [:> rn/View {:style {:background-color (:bg t) :border-radius 16
+                             :padding 24 :width "85%"}}
+         [:> rn/Text {:style {:font-size 20 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
+          "Regenerate Identity"]
+         [:> rn/Text {:style {:font-size 15 :color (:text-secondary t) :margin-bottom 20
+                              :line-height 22}}
+          "This will generate a new Yggdrasil identity and restart the network. Your current identity will be lost. Are you sure?"]
+         [:> rn/View {:style {:flex-direction :row :justify-content :flex-end}}
+          [:> rn/Pressable {:on-press #(reset! *confirm-regenerate nil)
+                            :style {:padding-horizontal 16 :padding-vertical 10
+                                    :margin-right 12}}
+           [:> rn/Text {:style {:font-size 15 :color (:cancel-text t)}} "Cancel"]]
+          [:> rn/Pressable {:style {:background-color (:warning t) :padding-horizontal 20
+                                    :padding-vertical 10 :border-radius 8}
+                            :on-press (fn []
+                                        (rf/dispatch [:yggstack/generate-new-identity])
+                                        (reset! *confirm-regenerate nil))}
+           [:> rn/Text {:style {:color :white :font-weight :600}} "Regenerate"]]]]])
+     [:> StatusBar {:style "auto"}]]))
 
 
