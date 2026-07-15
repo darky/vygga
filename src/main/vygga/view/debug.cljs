@@ -1,7 +1,7 @@
 (ns vygga.view.debug
   (:require [vygga.subs]
             [vygga.theme :as theme]
-            [vygga.widgets :refer [button]]
+            [vygga.view.widgets :refer [button]]
             [re-frame.core :as rf]
             ["react-native" :as rn]
             [reagent.core :as r]))

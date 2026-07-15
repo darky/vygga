@@ -19,7 +19,7 @@
    [vygga.view.navigation-test]
    [vygga.view.calls-test]
    [vygga.view.debug-test]
-   [vygga.widgets-test]
+   [vygga.view.widgets-test]
    [vygga.storage-test]
    [vygga.messenger-test]
    [vygga.tcp-server-test]
@@ -47,7 +47,7 @@
    'vygga.view.navigation-test
    'vygga.view.calls-test
    'vygga.view.debug-test
-   'vygga.widgets-test
+   'vygga.view.widgets-test
    'vygga.storage-test
    'vygga.messenger-test
    'vygga.tcp-server-test

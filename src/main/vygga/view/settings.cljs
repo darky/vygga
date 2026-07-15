@@ -5,7 +5,7 @@
             [vygga.subs]
             [vygga.config :as config]
             [vygga.theme :as theme]
-            [vygga.widgets :refer [button]]
+            [vygga.view.widgets :refer [button]]
             [vygga.view.yggstatus :refer [status-label]]
             ["expo-status-bar" :refer [StatusBar]]
             [re-frame.core :as rf]

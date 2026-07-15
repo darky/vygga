@@ -1,7 +1,7 @@
-(ns vygga.widgets-test
+(ns vygga.view.widgets-test
   (:require
    [cljs.test :refer-macros [deftest is]]
-   [vygga.widgets :as widgets]))
+   [vygga.view.widgets :as widgets]))
 
 (defn text-in-tree [root]
   (filter string? (tree-seq vector? seq root)))

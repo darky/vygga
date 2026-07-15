@@ -1,4 +1,4 @@
-(ns vygga.widgets
+(ns vygga.view.widgets
   (:require [vygga.theme :as theme]
             [re-frame.core :as rf]
             [reagent.core :as r]
