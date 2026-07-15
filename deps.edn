@@ -10,7 +10,7 @@
  :aliases
   {:dev        {:extra-deps {thheller/shadow-cljs {:mvn/version "3.4.11"}
                                     nrepl/nrepl          {:mvn/version "1.7.0"}
-                                     cider/cider-nrepl    {:mvn/version "0.61.0"}}}
+                                     cider/cider-nrepl    {:mvn/version "0.62.1"}}}
 
   ;; Shadow-cljs build
   :shadow     {:main-opts ["-m" "shadow.cljs.devtools.cli"]}
