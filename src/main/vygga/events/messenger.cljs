@@ -10,14 +10,30 @@
 
 (rf/reg-event-fx
  :messenger/add-contact
- (fn [{db :db} [_ {:keys [address]}]]
+ (fn [{db :db} [_ {:keys [address name]}]]
    (if (get-in db [:messenger :contacts address])
      {:db db}
      {:db (assoc-in db [:messenger :contacts address]
-                    {:address address
-                     :messages [] :msg-index {}
-                     :unread-count 0})
+                    (merge {:address address
+                            :messages [] :msg-index {}
+                            :unread-count 0}
+                           (when (seq name) {:name name})))
       :messenger/save-contacts nil})))
+
+(rf/reg-event-fx
+ :messenger/update-contact-name
+ (fn [{db :db} [_ contact-id name]]
+   (if (get-in db [:messenger :contacts contact-id])
+     (let [name (when (seq name) name)]
+       {:db (assoc-in db [:messenger :contacts contact-id :name] name)
+        :messenger/save-contacts nil})
+     {:db db})))
+
+(rf/reg-event-fx
+ :messenger/remove-contact
+ (fn [{db :db} [_ contact-id]]
+   {:db (update-in db [:messenger :contacts] dissoc contact-id)
+    :messenger/save-contacts nil}))
 
 (rf/reg-event-db
  :messenger/set-current-contact
@@ -50,7 +66,7 @@
                              (merge {:messages msgs
                                      :msg-index idx
                                      :unread-count 0}
-                                    (select-keys v [:address :public-key :unread-count])))))
+                                    (select-keys v [:address :public-key :unread-count :name])))))
                   {} contacts)]
      (assoc-in db [:messenger :contacts] rekeyed))))
 

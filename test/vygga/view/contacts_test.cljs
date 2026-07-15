@@ -17,7 +17,7 @@
         result (contacts-view/contact-item-render
                 props "c1"
                 {:address "201::1" :last-message {:text "Hey!"}}
-                theme/light)]
+                theme/light nil)]
     (is (text-present? result "201::1"))
     (is (text-present? result "2"))
     (is (text-present? result "Hey!"))))
@@ -27,7 +27,7 @@
         result (contacts-view/contact-item-render
                 props "c2"
                 {:address "201::2"}
-                theme/light)]
+                theme/light nil)]
     (is (text-present? result "201::2"))
     (is (text-present? result "2"))
     (is (not (text-present? result "Hey!")))))
@@ -37,7 +37,7 @@
         result (contacts-view/contact-item-render
                 props "c3"
                 {:address "201::3" :unread-count 5}
-                theme/light)]
+                theme/light nil)]
     (is (text-present? result "201::3"))
     (is (text-present? result "5"))))
 
@@ -46,13 +46,13 @@
         result (contacts-view/contact-item-render
                 props "c4"
                 {:address "201::4" :unread-count 100}
-                theme/light)]
+                theme/light nil)]
     (is (text-present? result "99+")))
   (let [props #js {:navigation #js {:navigate (fn [])}}
         result (contacts-view/contact-item-render
                 props "c5"
                 {:address "201::5" :unread-count 999}
-                theme/light)]
+                theme/light nil)]
     (is (text-present? result "99+"))))
 
 (deftest test-contact-item-render-no-unread-when-zero
@@ -60,7 +60,7 @@
         result (contacts-view/contact-item-render
                 props "c6"
                 {:address "201::6" :unread-count 0}
-                theme/light)]
+                theme/light nil)]
     (is (text-present? result "201::6"))
     (is (not (text-present? result "0")))))
 
@@ -69,9 +69,39 @@
         result (contacts-view/contact-item-render
                 props "c7"
                 {:address "201::7"}
-                theme/light)]
+                theme/light nil)]
     (is (text-present? result "201::7"))
     (is (not (text-present? result "0")))))
+
+(deftest test-contact-item-render-with-name
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (contacts-view/contact-item-render
+                props "c8"
+                {:address "201::8" :name "Alice"}
+                theme/light nil)]
+    (is (text-present? result "Alice"))
+    (is (text-present? result "201::8"))
+    (is (text-present? result "A"))))
+
+(deftest test-contact-item-render-with-name-and-preview
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (contacts-view/contact-item-render
+                props "c9"
+                {:address "201::9" :name "Bob" :last-message {:text "Hello!"}}
+                theme/light nil)]
+    (is (text-present? result "Bob"))
+    (is (text-present? result "201::9"))
+    (is (text-present? result "Hello!"))
+    (is (text-present? result "B"))))
+
+(deftest test-contact-item-render-avatar-uses-name-letter
+  (let [props #js {:navigation #js {:navigate (fn [])}}
+        result (contacts-view/contact-item-render
+                props "c10"
+                {:address "201::10" :name "Charlie"}
+                theme/light nil)]
+    (is (text-present? result "C"))
+    (is (not (text-present? result "2")))))
 
 (deftest test-contacts-smoke
   (let [result (contacts-view/contacts #js {:navigation #js {:navigate (fn [])}})]
@@ -79,7 +109,7 @@
 
 (deftest test-contact-item-smoke
   (let [props #js {:navigation #js {:navigate (fn [])}}
-        result (contacts-view/contact-item props "c1" {:address "201::1"})]
+        result (contacts-view/contact-item props "c1" {:address "201::1"} nil)]
     (is (some? result))))
 
 (deftest test-contacts-add-contact

@@ -87,8 +87,17 @@
         [:> rn/View {:style {:padding-horizontal 16 :padding-vertical 12
                              :border-bottom-width 1 :border-bottom-color (:border t)
                              :flex-direction :row :align-items :center}}
-         [:> rn/Text {:style {:font-size 17 :font-weight :600 :flex 1 :color (:text-primary t)}}
-          (or (:address c) "Unknown")]
+         [:> rn/View {:style {:flex 1}}
+          (if (seq (:name c))
+            [:<>]
+            [:> rn/Text {:style {:font-size 17 :font-weight :600 :color (:text-primary t)}}
+             (or (:address c) "Unknown")])
+          (when (seq (:name c))
+            [:> rn/Text {:style {:font-size 17 :font-weight :600 :color (:text-primary t)}}
+             (:name c)])
+          (when (seq (:name c))
+            [:> rn/Text {:style {:font-size 12 :color (:text-tertiary t) :margin-top 1}}
+             (:address c)])]
          [call-button {:contact-id cid :t t}]]
         (if (empty? msgs)
           [:> rn/View {:style {:flex 1 :padding 40 :align-items :center}}
