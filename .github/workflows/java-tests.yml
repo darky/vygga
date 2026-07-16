@@ -1,0 +1,92 @@
+name: Java Plugin Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'plugins/android-*/**'
+      - 'plugins/java-tests/**'
+      - 'vendor/opus/**'
+      - 'vendor/yggstack/src/**'
+      - 'vendor/yggstack/mobile/**'
+      - '.github/workflows/java-tests.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'plugins/android-*/**'
+      - 'plugins/java-tests/**'
+      - 'vendor/opus/**'
+      - 'vendor/yggstack/src/**'
+      - 'vendor/yggstack/mobile/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+  ANDROID_HOME: /usr/local/lib/android/sdk
+
+jobs:
+  java-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── JDK 21 ──
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # ── Go 1.25 + gomobile (for yggstack AAR) ──
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: |
+            vendor/yggstack/go.sum
+            vendor/yggstack/go.mod
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      # ── AAR cache: rebuilt only when Go source changes ──
+      - name: Cache yggstack AAR
+        id: cache-aar
+        uses: actions/cache@v4
+        with:
+          path: vendor/yggstack/android-build/yggstack.aar
+          key: yggstack-${{ hashFiles('vendor/yggstack/mobile/*.go', 'vendor/yggstack/src/**') }}
+
+      # ── Build AAR (only on cache miss) ──
+      - name: Build yggstack AAR
+        if: steps.cache-aar.outputs.cache-hit != 'true'
+        run: cd vendor/yggstack && ./mobile/build-android.sh
+        env:
+          CI: 'true'
+
+      # ── Native opus for real JNI codec tests ──
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libopus-dev \
+            build-essential
+
+      # ── Gradle cache ──
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('plugins/java-tests/**/*.gradle', 'plugins/java-tests/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # ── Run Java plugin tests ──
+      - name: Run Java plugin tests
+        run: cd plugins/java-tests && ./gradlew test --no-daemon

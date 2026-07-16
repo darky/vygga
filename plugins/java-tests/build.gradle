@@ -1,0 +1,90 @@
+plugins {
+    id 'com.android.library' version '8.13.0'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+android {
+    namespace 'expo.modules.tests'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 36
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += [
+                '../../plugins/android-yggdrasil',
+                '../../plugins/android-audiotrack',
+                '../../plugins/android-floating-overlay',
+                '../../plugins/android-wifilock'
+            ]
+        }
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+}
+
+dependencies {
+    implementation('com.facebook.react:react-android:0.86.0') {
+        exclude group: 'androidx.core', module: 'core-ktx'
+    }
+    implementation 'androidx.core:core-ktx:1.18.0'
+    implementation files('../../vendor/yggstack/android-build/yggstack.aar')
+    implementation 'androidx.core:core:1.18.0'
+    implementation 'androidx.annotation:annotation:1.9.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.16.1'
+    testImplementation 'org.mockito:mockito-core:5.23.0'
+}
+
+tasks.register('compileOpusJni', Exec) {
+    def outputDir = file("${buildDir}/nativeLibs")
+    def isMac = System.getProperty('os.name').toLowerCase().contains('mac')
+    def libName = isMac ? 'libopus_jni.dylib' : 'libopus_jni.so'
+    def outputFile = file("${outputDir}/${libName}")
+    def opusPrefix = isMac ? '/opt/homebrew/opt/opus' : '/usr'
+
+    inputs.file('../../plugins/android-audiotrack/libopus/opus_jni.c')
+    outputs.file(outputFile)
+
+    def javaHome = System.getProperty('java.home')
+    def includeDir = isMac ? "${javaHome}/include/darwin" : "${javaHome}/include/linux"
+
+    workingDir = projectDir
+    commandLine 'cc', '-shared', '-fPIC',
+        "-I${javaHome}/include",
+        "-I${includeDir}",
+        "-I${opusPrefix}/include/opus",
+        file('../../plugins/android-audiotrack/libopus/opus_jni.c'),
+        "-L${opusPrefix}/lib", '-lopus', '-lm',
+        '-o', outputFile
+
+    doFirst {
+        outputDir.mkdirs()
+    }
+}
+
+tasks.matching { it.name in ['testDebugUnitTest', 'testReleaseUnitTest'] }.configureEach {
+    dependsOn 'compileOpusJni'
+    systemProperty 'java.library.path', file("${buildDir}/nativeLibs").absolutePath
+    // Fork per test class to avoid Robolectric sandbox classloader conflicts
+    // with System.loadLibrary in OpusBridge static initializer
+    forkEvery 1
+}

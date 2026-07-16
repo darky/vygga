@@ -9,3 +9,9 @@
 /android/
 /ios
 plugins/android-audiotrack/jniLibs/
+plugins/java-tests/build/
+plugins/java-tests/.gradle/
+plugins/java-tests/local.properties
+plugins/java-tests/.classpath
+plugins/java-tests/.project
+plugins/java-tests/.settings/
