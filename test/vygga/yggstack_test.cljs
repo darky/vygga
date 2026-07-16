@@ -58,70 +58,70 @@
 
 (deftest test-generate-config
   (t/async done
-    (reset-calls!)
-    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
-      (-> (ygg/generate-config)
-          (.then (fn [result]
-                   (is (= "{\"PrivateKey\":\"test\"}" result))
-                   (is (= [:generateConfig] @mod-calls))
-                   (done)))))))
+           (reset-calls!)
+           (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+             (-> (ygg/generate-config)
+                 (.then (fn [result]
+                          (is (= "{\"PrivateKey\":\"test\"}" result))
+                          (is (= [:generateConfig] @mod-calls))
+                          (done)))))))
 
 (deftest test-start
   (t/async done
-    (reset-calls!)
-    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
-      (-> (ygg/start "config" "127.0.0.1:1080" "")
-          (.then (fn [_]
-                   (is (= [[:start "config" "127.0.0.1:1080" ""]] @mod-calls))
-                   (done)))))))
+           (reset-calls!)
+           (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+             (-> (ygg/start "config" "127.0.0.1:1080" "")
+                 (.then (fn [_]
+                          (is (= [[:start "config" "127.0.0.1:1080" ""]] @mod-calls))
+                          (done)))))))
 
 (deftest test-stop
   (t/async done
-    (reset-calls!)
-    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
-      (-> (ygg/stop)
-          (.then (fn [_]
-                   (is (= [:stop] @mod-calls))
-                   (done)))))))
+           (reset-calls!)
+           (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+             (-> (ygg/stop)
+                 (.then (fn [_]
+                          (is (= [:stop] @mod-calls))
+                          (done)))))))
 
 (deftest test-get-peers
   (t/async done
-    (reset-calls!)
-    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
-      (-> (ygg/get-peers)
-          (.then (fn [result]
-                   (is (= "[]" result))
-                   (is (= [:getPeersJSON] @mod-calls))
-                   (done)))))))
+           (reset-calls!)
+           (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+             (-> (ygg/get-peers)
+                 (.then (fn [result]
+                          (is (= "[]" result))
+                          (is (= [:getPeersJSON] @mod-calls))
+                          (done)))))))
 
 (deftest test-get-address
   (t/async done
-    (reset-calls!)
-    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
-      (-> (ygg/get-address)
-          (.then (fn [result]
-                   (is (= "201::1" result))
-                   (is (= [:getAddress] @mod-calls))
-                   (done)))))))
+           (reset-calls!)
+           (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+             (-> (ygg/get-address)
+                 (.then (fn [result]
+                          (is (= "201::1" result))
+                          (is (= [:getAddress] @mod-calls))
+                          (done)))))))
 
 (deftest test-get-public-key
   (t/async done
-    (reset-calls!)
-    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
-      (-> (ygg/get-public-key)
-          (.then (fn [result]
-                   (is (= "pubkey123" result))
-                   (is (= [:getPublicKey] @mod-calls))
-                   (done)))))))
+           (reset-calls!)
+           (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+             (-> (ygg/get-public-key)
+                 (.then (fn [result]
+                          (is (= "pubkey123" result))
+                          (is (= [:getPublicKey] @mod-calls))
+                          (done)))))))
 
 (deftest test-retry-peers-now
   (t/async done
-    (reset-calls!)
-    (with-redefs [vygga.yggstack/native-module (make-mock-module)]
-      (-> (ygg/retry-peers-now)
-          (.then (fn [_]
-                   (is (= [:retryPeersNow] @mod-calls))
-                   (done)))))))
+           (reset-calls!)
+           (with-redefs [vygga.yggstack/native-module (make-mock-module)]
+             (-> (ygg/retry-peers-now)
+                 (.then (fn [_]
+                          (is (= [:retryPeersNow] @mod-calls))
+                          (done)))))))
 
 (deftest test-start-foreground-service
   (let [log-msgs (atom [])

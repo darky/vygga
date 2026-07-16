@@ -14,20 +14,20 @@
 
 (deftest test-add-remote-mapping
   (t/async done
-    (-> (msg/add-remote-mapping 7777)
-        (.then (fn [result]
-                 (is (true? result))
-                 (done))
-               (fn [err]
-                 (is (false? (str "add-remote-mapping rejected: " err)))
-                 (done))))))
+           (-> (msg/add-remote-mapping 7777)
+               (.then (fn [result]
+                        (is (true? result))
+                        (done))
+                      (fn [err]
+                        (is (false? (str "add-remote-mapping rejected: " err)))
+                        (done))))))
 
 (deftest test-remove-remote-mapping
   (t/async done
-    (-> (msg/remove-remote-mapping 7777)
-        (.then (fn [result]
-                 (is (true? result))
-                 (done))
-               (fn [err]
-                 (is (false? (str "remove-remote-mapping rejected: " err)))
-                 (done))))))
+           (-> (msg/remove-remote-mapping 7777)
+               (.then (fn [result]
+                        (is (true? result))
+                        (done))
+                      (fn [err]
+                        (is (false? (str "remove-remote-mapping rejected: " err)))
+                        (done))))))

@@ -3,10 +3,10 @@
                                    :git/sha "fdd1d0bc432f63db69e3a72167ef5e46f10dfba7"}}
  :tasks {check-format {:doc "Check Clojure formatting"
                        :requires ([cljfmt.tool :as fmt])
-                       :task (fmt/check {:paths ["src/main"]})}
-         fix-format   {:doc "Fix Clojure formatting"
-                       :requires ([cljfmt.tool :as fmt])
-                       :task (fmt/fix {:paths ["src/main"]})}
+                        :task (fmt/check {:paths ["src/main" "test"]})}
+          fix-format   {:doc "Fix Clojure formatting"
+                        :requires ([cljfmt.tool :as fmt])
+                        :task (fmt/fix {:paths ["src/main" "test"]})}
           check-unused-vars {:doc "Check for unused vars (exits non-zero on findings)"
                              :requires ([carve.api :as carve])
                              :task (let [{:keys [exit-code]} (carve/carve! {:paths ["src/main"]

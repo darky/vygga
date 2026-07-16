@@ -3,7 +3,7 @@
    [cljs.test :refer-macros [deftest is use-fixtures]]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
-    [vygga.events.yggstack]
+   [vygga.events.yggstack]
    [vygga.subs]
    [vygga.view.yggstatus :as yggstatus]
    [vygga.theme :as theme]

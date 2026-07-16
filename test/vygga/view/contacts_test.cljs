@@ -3,7 +3,7 @@
    [cljs.test :refer-macros [deftest is use-fixtures]]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
-    [vygga.events.contacts]
+   [vygga.events.contacts]
    [vygga.subs]
    [vygga.view.contacts :as contacts-view]
    [vygga.theme :as theme]
@@ -124,6 +124,6 @@
 (deftest test-contacts-set-current
   (let [cid "my-contact"]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts cid]
-                                   {:address "201::4"}))
+                                 {:address "201::4"}))
     (rf/dispatch-sync [:contacts/set-current-contact cid])
     (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))))

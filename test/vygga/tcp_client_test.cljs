@@ -45,10 +45,10 @@
 
 (deftest test-send-message-via-socks
   (t/async done
-    (-> (tcp-client/send-message! "201::1" "{:type \"message\" :text \"hi\"}")
-        (.then (fn [result]
-                 (is (true? result))
-                 (done))
-               (fn [err]
-                 (is (false? (str "should not reject: " err)))
-                 (done))))))
+           (-> (tcp-client/send-message! "201::1" "{:type \"message\" :text \"hi\"}")
+               (.then (fn [result]
+                        (is (true? result))
+                        (done))
+                      (fn [err]
+                        (is (false? (str "should not reject: " err)))
+                        (done))))))

@@ -3,7 +3,7 @@
    [cljs.test :as t :refer-macros [deftest is use-fixtures]]
    [re-frame.db :as rdb]
    [vygga.tcp-server :as tcp-server]
-    [vygga.events.messenger]
+   [vygga.events.messenger]
    [vygga.events.contacts]
    [vygga.crypto :as crypto]
    [vygga.db :refer [app-db]]))
@@ -32,14 +32,14 @@
 (deftest test-parse-and-dispatch-incoming
   (let [msg-edn (make-signed-msg-edn "hello" "201::1" "m1" 100)]
     (t/async done
-      (tcp-server/parse-and-dispatch msg-edn)
-      (js/setTimeout
-       (fn []
-         (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
-           (is (= 1 (count contacts)))
-           (is (= "hello" (get-in (val (first contacts)) [:messages 0 :text]))))
-         (done))
-       50))))
+             (tcp-server/parse-and-dispatch msg-edn)
+             (js/setTimeout
+              (fn []
+                (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
+                  (is (= 1 (count contacts)))
+                  (is (= "hello" (get-in (val (first contacts)) [:messages 0 :text]))))
+                (done))
+              50))))
 
 (deftest test-parse-and-dispatch-invalid-edn
   (let [warn-msgs (atom [])
@@ -53,14 +53,14 @@
   (let [msg1-edn (make-signed-msg-edn "a" "201::1" "m1" 100)
         msg2-edn (make-signed-msg-edn "b" "201::2" "m2" 200)]
     (t/async done
-      (tcp-server/parse-and-dispatch msg1-edn)
-      (tcp-server/parse-and-dispatch msg2-edn)
-      (js/setTimeout
-       (fn []
-         (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
-           (is (= 2 (count contacts))))
-         (done))
-       50))))
+             (tcp-server/parse-and-dispatch msg1-edn)
+             (tcp-server/parse-and-dispatch msg2-edn)
+             (js/setTimeout
+              (fn []
+                (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
+                  (is (= 2 (count contacts))))
+                (done))
+              50))))
 
 (deftest test-parse-and-dispatch-ignores-non-message-type
   (let [edn (pr-str {:type "presence" :from "201::1" :status "online"})]
@@ -78,21 +78,21 @@
 
 (deftest test-tcp-server-start-stop
   (t/async done
-    (-> (tcp-server/start! 7777)
-        (.then (fn [result]
-                 (is (true? result))
-                 (is (true? (tcp-server/running?)))
-                 (-> (tcp-server/stop!)
-                     (.then (fn []
-                              (is (false? (tcp-server/running?)))
-                              (done)))))))))
+           (-> (tcp-server/start! 7777)
+               (.then (fn [result]
+                        (is (true? result))
+                        (is (true? (tcp-server/running?)))
+                        (-> (tcp-server/stop!)
+                            (.then (fn []
+                                     (is (false? (tcp-server/running?)))
+                                     (done)))))))))
 
 (deftest test-tcp-server-start-twice-rejects
   (t/async done
-    (-> (tcp-server/start! 7777)
-        (.then (fn []
-                 (-> (tcp-server/start! 7777)
-                     (.then (fn [] (is false "should have rejected") (done))
-                            (fn [err]
-                              (is (some? err))
-                              (-> (tcp-server/stop!) (.then #(done)))))))))))
+           (-> (tcp-server/start! 7777)
+               (.then (fn []
+                        (-> (tcp-server/start! 7777)
+                            (.then (fn [] (is false "should have rejected") (done))
+                                   (fn [err]
+                                     (is (some? err))
+                                     (-> (tcp-server/stop!) (.then #(done)))))))))))
