@@ -12,7 +12,7 @@ const YGGSTACK_AAR_SRC = path.join(
   __dirname, '..', 'vendor', 'yggstack', 'android-build', 'yggstack.aar'
 );
 const YGGSTACK_PACKAGE = 'expo.modules.yggstack';
-const YGGSTACK_JAVA_SRC = path.join(__dirname, 'android');
+const YGGSTACK_JAVA_SRC = path.join(__dirname, 'android-yggdrasil');
 
 function withYggstackCopyAAR(config) {
   return withDangerousMod(config, [
