@@ -3,7 +3,7 @@
    [cljs.test :refer-macros [deftest is use-fixtures]]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
-    [vygga.events.messenger]
+    [vygga.events.contacts]
    [vygga.subs]
    [vygga.view.contacts :as contacts-view]
    [vygga.theme :as theme]
@@ -113,7 +113,7 @@
     (is (some? result))))
 
 (deftest test-contacts-add-contact
-  (rf/dispatch-sync [:messenger/add-contact {:address "201::3"}])
+  (rf/dispatch-sync [:contacts/add-contact {:address "201::3"}])
   (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
     (is (= 1 (count contacts)))
     (let [[cid c] (first contacts)]
@@ -125,5 +125,5 @@
   (let [cid "my-contact"]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts cid]
                                    {:address "201::4"}))
-    (rf/dispatch-sync [:messenger/set-current-contact cid])
+    (rf/dispatch-sync [:contacts/set-current-contact cid])
     (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))))

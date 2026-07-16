@@ -27,12 +27,12 @@
    (get-in db [:yggstack :address])))
 
 (rf/reg-sub
- :messenger/contacts
+ :contacts/list
  (fn [db _]
    (get-in db [:messenger :contacts])))
 
 (rf/reg-sub
- :messenger/current-contact
+ :contacts/current
  (fn [db _]
    (get-in db [:messenger :current-contact])))
 
@@ -62,7 +62,7 @@
    (get-in db [:debug :logs])))
 
 (rf/reg-sub
- :messenger/sorted-contacts
+ :contacts/sorted
  (fn [db _]
    (->> (get-in db [:messenger :contacts])
         (sort-by (fn [[_ c]] (:address c)))

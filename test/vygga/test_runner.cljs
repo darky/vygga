@@ -8,8 +8,9 @@
    [vygga.events.navigation-test]
    [vygga.events.app-test]
    [vygga.events.yggstack-test]
-   [vygga.events.messenger-test]
-   [vygga.events.voip-test]
+    [vygga.events.messenger-test]
+    [vygga.events.contacts-test]
+    [vygga.events.voip-test]
    [vygga.events.debug-test]
    [vygga.subs-test]
    [vygga.view.yggstatus-test]
@@ -36,8 +37,9 @@
    'vygga.events.navigation-test
    'vygga.events.app-test
    'vygga.events.yggstack-test
-   'vygga.events.messenger-test
-   'vygga.events.voip-test
+    'vygga.events.messenger-test
+    'vygga.events.contacts-test
+    'vygga.events.voip-test
    'vygga.events.debug-test
    'vygga.subs-test
    'vygga.view.yggstatus-test

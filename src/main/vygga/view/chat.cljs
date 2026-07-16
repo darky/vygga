@@ -73,8 +73,8 @@
       [:> rn/Text {:style {:color (:text-inverse t) :font-size 18}} "➤"]]]))
 
 (defn chat []
-  (r/with-let [current-id (rf/subscribe [:messenger/current-contact])
-               contacts (rf/subscribe [:messenger/contacts])
+  (r/with-let [current-id (rf/subscribe [:contacts/current])
+               contacts (rf/subscribe [:contacts/list])
                *flat-ref (r/atom nil)
                *at-bottom (r/atom true)
                pref (rf/subscribe [:theme/preferred-scheme])

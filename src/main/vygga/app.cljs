@@ -2,6 +2,7 @@
   (:require [vygga.events.app]
             [vygga.events.yggstack]
             [vygga.events.messenger]
+            [vygga.events.contacts]
             [vygga.events.voip]
             [vygga.events.debug]
             [vygga.subs]

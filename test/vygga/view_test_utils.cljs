@@ -23,8 +23,8 @@
   (rf/reg-fx :messenger/start-tcp-server (mock-fx :messenger/start-tcp-server))
   (rf/reg-fx :messenger/stop-tcp-server (mock-fx :messenger/stop-tcp-server))
   (rf/reg-fx :messenger/send-via-socks (mock-fx :messenger/send-via-socks))
-  (rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
-  (rf/reg-fx :messenger/save-contacts (mock-fx :messenger/save-contacts)))
+  (rf/reg-fx :contacts/load-contacts (mock-fx :contacts/load-contacts))
+  (rf/reg-fx :contacts/save-contacts (mock-fx :contacts/save-contacts)))
 
 (defn text-in-tree [root]
   (filter string? (tree-seq vector? seq root)))

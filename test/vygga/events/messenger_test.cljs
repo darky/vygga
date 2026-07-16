@@ -18,8 +18,7 @@
   (rf/reg-fx :messenger/start-tcp-server (mock-fx :messenger/start-tcp-server))
   (rf/reg-fx :messenger/stop-tcp-server (mock-fx :messenger/stop-tcp-server))
   (rf/reg-fx :messenger/send-via-socks (mock-fx :messenger/send-via-socks))
-  (rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
-  (rf/reg-fx :messenger/save-contacts (mock-fx :messenger/save-contacts))
+  (rf/reg-fx :contacts/save-contacts (mock-fx :contacts/save-contacts))
   (rf/reg-fx :messenger/show-incoming-notification (mock-fx :messenger/show-incoming-notification)))
 
 (use-fixtures :each (fn [t] (setup) (t)))
@@ -42,102 +41,6 @@
   (is (= false (get-in @rdb/app-db [:messenger :server-running])))
   (is (contains? @captured :messenger/stop-tcp-server)
       "stop-server should stop tcp server"))
-
-(deftest test-messenger-add-contact
-  (let [addr "201:abcd::1"]
-    (rf/dispatch-sync [:messenger/add-contact {:address addr}])
-    (let [contacts (get-in @rdb/app-db [:messenger :contacts])
-          c (get contacts addr)]
-      (is (= 1 (count contacts)))
-      (is (contains? contacts addr))
-      (is (not (contains? c :name)))
-      (is (= addr (:address c)))
-      (is (= [] (:messages c)))
-      (is (= {} (:msg-index c)))
-      (is (= {:address addr :messages [] :msg-index {} :unread-count 0} c)))))
-
-(deftest test-messenger-add-contact-with-name
-  (let [addr "201:abcd::5"]
-    (rf/dispatch-sync [:messenger/add-contact {:address addr :name "Alice"}])
-    (let [c (get-in @rdb/app-db [:messenger :contacts addr])]
-      (is (= "Alice" (:name c)))
-      (is (= addr (:address c))))))
-
-(deftest test-messenger-add-contact-with-empty-name
-  (let [addr "201:abcd::6"]
-    (rf/dispatch-sync [:messenger/add-contact {:address addr :name ""}])
-    (let [c (get-in @rdb/app-db [:messenger :contacts addr])]
-      (is (not (contains? c :name)))
-      (is (= addr (:address c))))))
-
-(deftest test-messenger-update-contact-name
-  (let [cid "201:abcd::7"]
-    (rf/dispatch-sync [:messenger/add-contact {:address cid}])
-    (rf/dispatch-sync [:messenger/update-contact-name cid "Bob"])
-    (let [c (get-in @rdb/app-db [:messenger :contacts cid])]
-      (is (= "Bob" (:name c))))
-    (is (contains? @captured :messenger/save-contacts))))
-
-(deftest test-messenger-update-contact-name-overwrite
-  (let [cid "201:abcd::8"]
-    (rf/dispatch-sync [:messenger/add-contact {:address cid :name "Alice"}])
-    (rf/dispatch-sync [:messenger/update-contact-name cid "Bob"])
-    (let [c (get-in @rdb/app-db [:messenger :contacts cid])]
-      (is (= "Bob" (:name c))))))
-
-(deftest test-messenger-update-contact-name-clear
-  (let [cid "201:abcd::9"]
-    (rf/dispatch-sync [:messenger/add-contact {:address cid :name "Alice"}])
-    (rf/dispatch-sync [:messenger/update-contact-name cid ""])
-    (let [c (get-in @rdb/app-db [:messenger :contacts cid])]
-      (is (nil? (:name c))))))
-
-(deftest test-messenger-update-contact-name-nonexistent
-  (rf/dispatch-sync [:messenger/update-contact-name "nonexistent" "Name"])
-  (let [c (get-in @rdb/app-db [:messenger :contacts "nonexistent"])]
-    (is (nil? c))
-    (is (not (contains? @captured :messenger/save-contacts)))))
-
-(deftest test-messenger-remove-contact
-  (let [cid "201:abcd::10"]
-    (rf/dispatch-sync [:messenger/add-contact {:address cid}])
-    (is (contains? (get-in @rdb/app-db [:messenger :contacts]) cid))
-    (reset! captured {})
-    (rf/dispatch-sync [:messenger/remove-contact cid])
-    (is (not (contains? (get-in @rdb/app-db [:messenger :contacts]) cid)))
-    (is (contains? @captured :messenger/save-contacts))))
-
-(deftest test-messenger-remove-contact-nonexistent
-  (rf/dispatch-sync [:messenger/remove-contact "nonexistent"])
-  (is (not (contains? (get-in @rdb/app-db [:messenger :contacts]) "nonexistent")))
-  (is (contains? @captured :messenger/save-contacts)))
-
-(deftest test-messenger-remove-contact-current
-  (let [cid "201:abcd::12"]
-    (rf/dispatch-sync [:messenger/add-contact {:address cid}])
-    (rf/dispatch-sync [:messenger/set-current-contact cid])
-    (rf/dispatch-sync [:messenger/remove-contact cid])
-    (is (nil? (get-in @rdb/app-db [:messenger :contacts cid])))
-    (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))))
-
-(deftest test-messenger-add-contact-duplicate
-  (let [addr "201:abcd::1"]
-    (rf/dispatch-sync [:messenger/add-contact {:address addr}])
-    (reset! captured {})
-    (rf/dispatch-sync [:messenger/add-contact {:address addr}])
-    (let [contacts (get-in @rdb/app-db [:messenger :contacts])]
-      (is (= 1 (count contacts)) "duplicate add should not create a second contact")
-      (is (contains? contacts addr) "contact should be keyed by address"))))
-
-(deftest test-messenger-set-current-contact
-  (let [cid "test-contact-1"
-        db-with-unread (assoc-in app-db
-                                 [:messenger :contacts cid]
-                                 {:address "201::1" :unread-count 3})]
-    (reset! rdb/app-db db-with-unread)
-    (rf/dispatch-sync [:messenger/set-current-contact cid])
-    (is (= cid (get-in @rdb/app-db [:messenger :current-contact])))
-    (is (= 0 (get-in @rdb/app-db [:messenger :contacts cid :unread-count])))))
 
 (deftest test-messenger-send-message
   (let [cid "test-contact"
@@ -235,64 +138,6 @@
       (is (= 2 (count msgs)) "message is appended when viewing"))
     (let [contact (get-in @rdb/app-db [:messenger :contacts address])]
       (is (= 0 (:unread-count contact)) "unread stays 0 when viewing the contact"))))
-
-(deftest test-messenger-restore-contacts
-  (let [contacts {"cid1" {:address "201::1"}
-                  "cid2" {:address "201::2"
-                          :messages [{:id "m1" :text "hi" :from-me true}
-                                     {:id "m2" :text "bye" :from-me false}]
-                          :unread-count 3}
-                  "cid3" {:address "201::3"
-                          :name "Charlie"
-                          :unread-count 1}}]
-    (rf/dispatch-sync [:messenger/restore-contacts contacts])
-    (let [msngr (:messenger @rdb/app-db)
-          alice (get-in msngr [:contacts "201::1"])
-          bob (get-in msngr [:contacts "201::2"])]
-      (is (= 3 (count (:contacts msngr))))
-      (is (contains? (:contacts msngr) "201::1"))
-      (is (= "201::1" (:address alice)))
-      (is (not (contains? alice :name)))
-      (is (= [] (:messages alice)) "no persisted messages leaves empty vector")
-      (is (= {} (:msg-index alice)) "no persisted messages leaves empty index")
-      (is (= 0 (:unread-count alice)) "no persisted unread-count defaults to 0")
-      (is (contains? (:contacts msngr) "201::2"))
-      (is (= "201::2" (:address bob)))
-      (is (= 2 (count (:messages bob))) "persisted messages are restored")
-      (is (= "hi" (get-in (:messages bob) [0 :text])))
-      (is (= "bye" (get-in (:messages bob) [1 :text])))
-      (is (= 0 (get-in bob [:msg-index "m1"])) "msg-index is rebuilt from restored messages")
-      (is (= 1 (get-in bob [:msg-index "m2"])))
-      (is (= 3 (:unread-count bob)) "unread-count is preserved from persisted data")
-      (let [charlie (get-in msngr [:contacts "201::3"])]
-        (is (some? charlie) "contact 3 is restored")
-        (is (= "Charlie" (:name charlie)) "name is preserved from persisted data")
-        (is (= 1 (:unread-count charlie)) "unread-count is preserved"))
-      (is (not (contains? (:contacts msngr) "cid1")) "old UUID key should be re-keyed to address")
-      (is (not (contains? (:contacts msngr) "cid2")) "old UUID key should be re-keyed to address"))))
-
-(deftest test-messenger-restore-contacts-limit-to-5
-  (let [msgs (vec (for [i (range 7)]
-                    {:id (str "msg-" i) :text (str "msg " i) :from-me true}))
-        contacts {"cid1" {:address "201::1" :messages msgs}}]
-    (rf/dispatch-sync [:messenger/restore-contacts contacts])
-    (let [restored-msgs (get-in @rdb/app-db [:messenger :contacts "201::1" :messages])
-          idx (get-in @rdb/app-db [:messenger :contacts "201::1" :msg-index])]
-      (is (= 5 (count restored-msgs)) "only last 5 messages survive restore")
-      (is (= "msg 2" (get-in restored-msgs [0 :text])) "first restored is index 2 (3rd)")
-      (is (= "msg 6" (get-in restored-msgs [4 :text])) "last restored is index 6 (7th)")
-      (is (= 0 (get idx "msg-2")) "msg-index is rebuilt for restored messages")
-      (is (= 4 (get idx "msg-6"))))))
-
-(deftest test-messenger-restore-contacts-dedup
-  (let [contacts {"cid1" {:address "201::1"}
-                  "cid2" {:address "201::1"}
-                  "cid3" {:address "201::2"}}]
-    (rf/dispatch-sync [:messenger/restore-contacts contacts])
-    (let [contacts-map (get-in @rdb/app-db [:messenger :contacts])]
-      (is (= 2 (count contacts-map)) "re-keying deduplicates by address")
-      (is (contains? contacts-map "201::1"))
-      (is (contains? contacts-map "201::2")))))
 
 (deftest test-messenger-receive-incoming-unsigned
   (rf/dispatch-sync [:messenger/receive-incoming

@@ -15,7 +15,7 @@
   (reset! captured {})
   (reset! rdb/app-db app-db)
   (rf/reg-fx :yggstack/load-and-start (mock-fx :yggstack/load-and-start))
-  (rf/reg-fx :messenger/load-contacts (mock-fx :messenger/load-contacts))
+  (rf/reg-fx :contacts/load-contacts (mock-fx :contacts/load-contacts))
   (rf/reg-fx :app/exit-fx (mock-fx :app/exit-fx)))
 
 (use-fixtures :each (fn [t] (setup) (t)))
@@ -24,7 +24,7 @@
   (rf/dispatch-sync [:initialize-db])
   (is (= app-db @rdb/app-db))
   (is (contains? @captured :yggstack/load-and-start))
-  (is (contains? @captured :messenger/load-contacts)))
+  (is (contains? @captured :contacts/load-contacts)))
 
 (deftest test-app-exit
   (rf/dispatch-sync [:app/exit])

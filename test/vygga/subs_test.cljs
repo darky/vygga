@@ -30,21 +30,21 @@
   (rf/dispatch-sync [:yggstack/update-address "201::1234"])
   (is (= "201::1234" @(rf/subscribe [:yggstack/address]))))
 
-(deftest test-messenger-contacts
+(deftest test-contacts-list
   (let [contacts {"c1" {:address "201::1"}}]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts] contacts))
-    (is (= contacts @(rf/subscribe [:messenger/contacts])))))
+    (is (= contacts @(rf/subscribe [:contacts/list])))))
 
-(deftest test-messenger-current-contact
+(deftest test-contacts-current
   (reset! rdb/app-db (assoc-in app-db [:messenger :current-contact] "cid1"))
-  (is (= "cid1" @(rf/subscribe [:messenger/current-contact]))))
+  (is (= "cid1" @(rf/subscribe [:contacts/current]))))
 
-(deftest test-messenger-sorted-contacts
+(deftest test-contacts-sorted
   (let [contacts {"b" {:address "201::b" :messages []}
                   "a" {:address "201::a" :messages [{:id "m1" :text "hello" :from-me true}]}
                   "c" {:address "201::c" :messages [] :unread-count 5}}]
     (reset! rdb/app-db (assoc-in app-db [:messenger :contacts] contacts))
-    (let [sorted @(rf/subscribe [:messenger/sorted-contacts])]
+    (let [sorted @(rf/subscribe [:contacts/sorted])]
       (is (= 3 (count sorted)))
       (is (= "a" (first (first sorted))))
       (is (= "201::c" (:address (second (last sorted)))))

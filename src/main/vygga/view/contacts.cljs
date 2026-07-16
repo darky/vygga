@@ -18,7 +18,7 @@
      [:> rn/TouchableOpacity
       {:style {:flex-direction :row :align-items :center :flex 1}
        :on-press #(do
-                    (rf/dispatch [:messenger/set-current-contact contact-id])
+                    (rf/dispatch [:contacts/set-current-contact contact-id])
                     (-> props .-navigation (.navigate "Chat")))}
       [:> rn/View {:style {:width 44 :height 44 :border-radius 22
                            :background-color (:accent t) :justify-content :center
@@ -58,8 +58,8 @@
     (contact-item-render props contact-id contact t on-options)))
 
 (defn contacts [props]
-  (r/with-let [sorted-contacts (rf/subscribe [:messenger/sorted-contacts])
-               raw-contacts (rf/subscribe [:messenger/contacts])
+  (r/with-let [sorted-contacts (rf/subscribe [:contacts/sorted])
+               raw-contacts (rf/subscribe [:contacts/list])
                *show-add (r/atom false)
                *new-addr (r/atom "")
                *addr-ref (r/atom nil)
@@ -114,7 +114,7 @@
                             :on-press (fn []
                                         (let [addr @*new-addr]
                                           (when (seq addr)
-                                            (rf/dispatch [:messenger/add-contact
+                                            (rf/dispatch [:contacts/add-contact
                                                           {:address addr}]))
                                           (reset! *new-addr "")
                                           (reset! *show-add false)
@@ -177,7 +177,7 @@
                                     :padding-vertical 10 :border-radius 8}
                             :on-press (fn []
                                         (let [n @*edit-name-val]
-                                          (rf/dispatch [:messenger/update-contact-name
+                                          (rf/dispatch [:contacts/update-contact-name
                                                         cid (when (seq n) n)])
                                           (reset! *edit-name-val "")
                                           (reset! *editing-contact nil)
@@ -206,7 +206,7 @@
             [:> rn/Pressable {:style {:background-color (:error t) :padding-horizontal 20
                                       :padding-vertical 10 :border-radius 8}
                               :on-press (fn []
-                                          (rf/dispatch [:messenger/remove-contact cid])
+                                          (rf/dispatch [:contacts/remove-contact cid])
                                           (reset! *confirm-remove nil))}
              [:> rn/Text {:style {:color :white :font-weight :600}} "Remove"]]]]]))
      [:> StatusBar {:style "auto"}]]))

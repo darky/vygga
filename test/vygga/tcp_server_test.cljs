@@ -4,6 +4,7 @@
    [re-frame.db :as rdb]
    [vygga.tcp-server :as tcp-server]
     [vygga.events.messenger]
+   [vygga.events.contacts]
    [vygga.crypto :as crypto]
    [vygga.db :refer [app-db]]))
 

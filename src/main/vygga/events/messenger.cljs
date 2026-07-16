@@ -1,87 +1,9 @@
 (ns vygga.events.messenger
-  (:require [cljs.reader :as reader]
-            [re-frame.core :as rf]
-            [re-frame.db :as rdb]
-            ["expo-secure-store" :as secure-store]
+  (:require [re-frame.core :as rf]
             [vygga.crypto :as crypto]
             [vygga.messenger :as msg]
             [vygga.messenger-utils :as mu]
             [vygga.notifications :as notif]))
-
-(rf/reg-event-fx
- :messenger/add-contact
- (fn [{db :db} [_ {:keys [address name]}]]
-   (if (get-in db [:messenger :contacts address])
-     {:db db}
-     {:db (assoc-in db [:messenger :contacts address]
-                    (merge {:address address
-                            :messages [] :msg-index {}
-                            :unread-count 0}
-                           (when (seq name) {:name name})))
-      :messenger/save-contacts nil})))
-
-(rf/reg-event-fx
- :messenger/update-contact-name
- (fn [{db :db} [_ contact-id name]]
-   (if (get-in db [:messenger :contacts contact-id])
-     (let [name (when (seq name) name)]
-       {:db (assoc-in db [:messenger :contacts contact-id :name] name)
-        :messenger/save-contacts nil})
-     {:db db})))
-
-(rf/reg-event-fx
- :messenger/remove-contact
- (fn [{db :db} [_ contact-id]]
-   {:db (update-in db [:messenger :contacts] dissoc contact-id)
-    :messenger/save-contacts nil}))
-
-(rf/reg-event-db
- :messenger/set-current-contact
- (fn [db [_ id]]
-   (-> db
-       (assoc-in [:messenger :current-contact] id)
-       (assoc-in [:messenger :contacts id :unread-count] 0))))
-
-(rf/reg-fx
- :messenger/load-contacts
- (fn [_]
-   (-> (secure-store/getItemAsync "vygga_contacts")
-       (.then (fn [edn-str]
-                (when edn-str
-                  (rf/dispatch [:messenger/restore-contacts
-                                (reader/read-string edn-str)]))))
-       (.catch (fn [e]
-                 (js/console.warn "Failed to load contacts:" e))))))
-
-(rf/reg-event-db
- :messenger/restore-contacts
- (fn [db [_ contacts]]
-   (let [rekeyed (reduce-kv
-                  (fn [acc _ v]
-                    (let [msgs (vec (take-last 5 (:messages v)))
-                          idx (reduce-kv (fn [m i msg]
-                                           (assoc m (:id msg) i))
-                                         {} msgs)]
-                      (assoc acc (:address v)
-                             (merge {:messages msgs
-                                     :msg-index idx
-                                     :unread-count 0}
-                                    (select-keys v [:address :public-key :unread-count :name])))))
-                  {} contacts)]
-     (assoc-in db [:messenger :contacts] rekeyed))))
-
-(rf/reg-fx
- :messenger/save-contacts
- (fn [_]
-   (let [contacts (get-in @rdb/app-db [:messenger :contacts])
-         stripped (reduce-kv (fn [acc k v]
-                               (assoc acc k
-                                      (-> (dissoc v :msg-index)
-                                          (update :messages #(vec (take-last 5 %))))))
-                             {} contacts)]
-     (-> (secure-store/setItemAsync "vygga_contacts" (pr-str stripped))
-         (.catch (fn [e]
-                   (js/console.warn "Failed to save contacts:" e)))))))
 
 (rf/reg-fx
  :messenger/show-incoming-notification
@@ -144,7 +66,7 @@
                                    :text text
                                    :msg-id msg-id
                                    :ts ts}
-        :messenger/save-contacts nil}
+        :contacts/save-contacts nil}
        (js/console.warn "Cannot send: missing address or text")))))
 
 (rf/reg-fx
@@ -228,7 +150,7 @@
                                   (assoc-in [:messenger :contacts from-addr :public-key] pubkey))
                         (not viewing?)
                         (update-in [:messenger :contacts from-addr :unread-count] (fnil inc 0)))
-                  :messenger/save-contacts nil
+                  :contacts/save-contacts nil
                   :messenger/show-incoming-notification {:from-addr from-addr
                                                          :text text}})
                {:db (assoc-in db [:messenger :contacts from-addr]
@@ -237,7 +159,7 @@
                                :messages [new-msg]
                                :msg-index {id 0}
                                :unread-count 1})
-                :messenger/save-contacts nil
+                :contacts/save-contacts nil
                 :messenger/show-incoming-notification {:from-addr from-addr
                                                        :text text}})))
          (js/console.warn "Invalid signature from" from-addr))))))

@@ -10,7 +10,7 @@
    (notif/init!)
    {:db app-db
     :yggstack/load-and-start nil
-    :messenger/load-contacts nil}))
+    :contacts/load-contacts nil}))
 
 (rf/reg-event-fx
  :app/exit
