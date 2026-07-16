@@ -25,6 +25,7 @@
       "./plugins/withYggstack",
       "./plugins/withNotificationSound",
       "./plugins/withAudioTrack",
+      "./plugins/withFloatingCallOverlay",
       "./plugins/withWifiLock",
       "expo-secure-store"
     ],

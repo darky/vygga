@@ -27,7 +27,10 @@
                            :from (or my-address "unknown")
                            :ts ts
                            :private-key private-key
-                           :public-key public-key}}
+                           :public-key public-key}
+        :voip/show-overlay {:mode :active
+                            :address address
+                            :call-id call-id}}
        (js/console.warn "Cannot call: missing address, key, or already in call")))))
 
 (rf/reg-event-fx
@@ -47,7 +50,10 @@
                            :private-key private-key
                            :public-key public-key}
         :voip/connect-audio {:address (:remote-addr state)
-                             :call-id (:call-id state)}}
+                             :call-id (:call-id state)}
+        :voip/show-overlay {:mode :active
+                            :address (:remote-addr state)
+                            :call-id (:call-id state)}}
        (js/console.warn "Cannot accept: not in ringing state")))))
 
 (rf/reg-event-fx
@@ -68,7 +74,8 @@
                            :ts (.now js/Date)
                            :private-key private-key
                            :public-key public-key}
-        :voip/disconnect-audio nil}
+        :voip/disconnect-audio nil
+        :voip/hide-overlay nil}
        (js/console.warn "Cannot reject: not in ringing state")))))
 
 (rf/reg-event-fx
@@ -89,7 +96,8 @@
                            :ts (.now js/Date)
                            :private-key private-key
                            :public-key public-key}
-        :voip/disconnect-audio nil}))))
+        :voip/disconnect-audio nil
+        :voip/hide-overlay nil}))))
 
 (rf/reg-event-fx
  :voip/incoming-signal
@@ -110,14 +118,20 @@
                       (assoc-in [:voip :audio-seq] 0))
               :messenger/show-incoming-notification {:from-addr from
                                                      :text "Incoming call"
-                                                     :type :call}}
+                                                     :type :call}
+              :voip/show-overlay {:mode :incoming
+                                  :address from
+                                  :call-id call-id}}
              (js/console.warn "Ignored call-offer: busy"))
 
            "accept"
            (if (and (= :calling current-state) (= call-id current-call-id))
              {:db (assoc-in db [:voip :call-state] :connected)
               :voip/connect-audio {:address from
-                                   :call-id call-id}}
+                                   :call-id call-id}
+              :voip/show-overlay {:mode :active
+                                  :address from
+                                  :call-id call-id}}
              (js/console.warn "Unexpected call-accept" call-id))
 
            "reject"
@@ -125,7 +139,8 @@
              {:db (assoc-in db [:voip] {:call-state :idle :call-id nil
                                         :remote-addr nil :started-at nil
                                         :audio-seq 0})
-              :voip/disconnect-audio nil}
+              :voip/disconnect-audio nil
+              :voip/hide-overlay nil}
              (js/console.warn "Unexpected call-reject" call-id))
 
            "end"
@@ -133,7 +148,8 @@
              {:db (assoc-in db [:voip] {:call-state :idle :call-id nil
                                         :remote-addr nil :started-at nil
                                         :audio-seq 0})
-              :voip/disconnect-audio nil})
+              :voip/disconnect-audio nil
+              :voip/hide-overlay nil})
 
            (js/console.warn "Unknown call-type:" call-type)))
        (js/console.warn "Invalid or unsigned call signal from" from)))))
@@ -171,6 +187,16 @@
    (when voip/audio-track-module
      (-> (.stopUdpAudio voip/audio-track-module)
          (.catch (fn [e] (js/console.warn "UDP audio stop error:" e)))))))
+
+(rf/reg-fx
+ :voip/show-overlay
+ (fn [{:keys [mode address call-id]}]
+   (voip/show-overlay! mode address call-id)))
+
+(rf/reg-fx
+ :voip/hide-overlay
+ (fn [_]
+   (voip/hide-overlay!)))
 
 (rf/reg-fx
  :voip/start-capture

@@ -27,6 +27,7 @@ Follow these conventions when writing tests:
 2. **Re-frame events** — use `re-frame.core/dispatch-sync` for synchronous testing; mock side-effect fx handlers via `re-frame.core/reg-fx`
 3. **Subscriptions** — test the handler function's data transformation directly; avoid `rf/subscribe` outside reactive context
 4. **JS interop** — native-only modules (`react-native`, `expo-*`, `@react-native-async-storage/async-storage`) are stubbed via `test/stubs/node_modules/`; the preload script at `test/support/preload.js` redirects `require()` for these modules at the Node.js level
+5. **Test every effect, not just db changes** — every `reg-fx` dispatched by an event handler must have at least one passing assertion proving it fires when expected, and one proving it does NOT fire when it shouldn't. Use `(contains? @captured :effect-key)` and inspect the options map. This catches regressions where an effect silently stops being dispatched.
 
 Run clj-kondo on both source and test directories:
 

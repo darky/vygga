@@ -22,7 +22,9 @@
   (rf/reg-fx :messenger/show-incoming-notification (mock-fx :messenger/show-incoming-notification))
   (rf/reg-fx :voip/send-signal (mock-fx :voip/send-signal))
   (rf/reg-fx :voip/connect-audio (mock-fx :voip/connect-audio))
-  (rf/reg-fx :voip/disconnect-audio (mock-fx :voip/disconnect-audio)))
+  (rf/reg-fx :voip/disconnect-audio (mock-fx :voip/disconnect-audio))
+  (rf/reg-fx :voip/show-overlay (mock-fx :voip/show-overlay))
+  (rf/reg-fx :voip/hide-overlay (mock-fx :voip/hide-overlay)))
 
 (use-fixtures :each (fn [t] (setup) (t)))
 
@@ -35,7 +37,9 @@
   (rf/dispatch-sync [:voip/call-contact "nonexistent"])
   (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
   (is (not (contains? @captured :voip/send-signal)))
-  (is (not (contains? @captured :voip/connect-audio))))
+  (is (not (contains? @captured :voip/connect-audio)))
+  (is (not (contains? @captured :voip/show-overlay))
+      "should not show overlay on missing address"))
 
 (deftest test-call-contact
   (let [contact-id "test-id"
@@ -55,7 +59,12 @@
       (is (= "offer" (:call-type signal)))
       (is (= address (:to signal))))
     (is (not (contains? @captured :voip/connect-audio))
-        "should not connect audio before callee accepts")))
+        "should not connect audio before callee accepts")
+    (let [overlay (get @captured :voip/show-overlay)]
+      (is (map? overlay) "show-overlay should fire")
+      (is (= :active (:mode overlay)))
+      (is (= address (:address overlay)))
+      (is (string? (:call-id overlay))))))
 
 (deftest test-call-contact-when-busy
   (let [contact-id "test-id"
@@ -70,7 +79,9 @@
     (reset! captured {})
     (rf/dispatch-sync [:voip/call-contact contact-id])
     (is (= :connected (get-in @rdb/app-db [:voip :call-state])) "should stay connected")
-    (is (not (contains? @captured :voip/send-signal)) "should not send signal")))
+    (is (not (contains? @captured :voip/send-signal)) "should not send signal")
+    (is (not (contains? @captured :voip/show-overlay))
+        "should not show overlay when busy")))
 
 (deftest test-accept-call-while-ringing
   (let [db-ringing (-> app-db
@@ -87,12 +98,18 @@
       (is (map? signal))
       (is (= "accept" (:call-type signal))))
     (is (contains? @captured :voip/connect-audio)
-        "accepting call should connect audio for bidirectional communication")))
+        "accepting call should connect audio for bidirectional communication")
+    (let [overlay (get @captured :voip/show-overlay)]
+      (is (map? overlay) "show-overlay should fire on accept")
+      (is (= :active (:mode overlay)))
+      (is (= "201::ring" (:address overlay))))))
 
 (deftest test-accept-call-while-idle
   (rf/dispatch-sync [:voip/accept-call])
   (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
-  (is (not (contains? @captured :voip/send-signal))))
+  (is (not (contains? @captured :voip/send-signal)))
+  (is (not (contains? @captured :voip/show-overlay))
+      "should not show overlay when accepting from idle"))
 
 (deftest test-reject-call
   (let [db-ringing (-> app-db
@@ -107,7 +124,9 @@
     (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
     (let [signal (get @captured :voip/send-signal)]
       (is (= "reject" (:call-type signal))))
-    (is (contains? @captured :voip/disconnect-audio))))
+    (is (contains? @captured :voip/disconnect-audio))
+    (is (contains? @captured :voip/hide-overlay)
+        "rejecting call should hide overlay")))
 
 (deftest test-end-call
   (let [states [:calling :ringing :connected]]
@@ -127,7 +146,9 @@
         (is (contains? @captured :voip/send-signal)
             (str "end from " s " sends signal"))
         (is (contains? @captured :voip/disconnect-audio)
-            (str "end from " s " disconnects audio"))))))
+            (str "end from " s " disconnects audio"))
+        (is (contains? @captured :voip/hide-overlay)
+            (str "end from " s " hides overlay"))))))
 
 (deftest test-incoming-signal-offer
   (let [seed (doto (js/Uint8Array. 32) (aset 0 77))
@@ -152,14 +173,21 @@
         (rf/dispatch-sync [:voip/incoming-signal msg])
         (is (= :ringing (get-in @rdb/app-db [:voip :call-state])))
         (is (= call-id (get-in @rdb/app-db [:voip :call-id])))
-        (is (= "201:aaaa::1" (get-in @rdb/app-db [:voip :remote-addr])))))
+        (is (= "201:aaaa::1" (get-in @rdb/app-db [:voip :remote-addr])))
+        (let [overlay (get @captured :voip/show-overlay)]
+          (is (map? overlay) "show-overlay should fire on incoming offer")
+          (is (= :incoming (:mode overlay)))
+          (is (= "201:aaaa::1" (:address overlay)))
+          (is (= call-id (:call-id overlay))))))
     (testing "unsigned offer is ignored"
       (setup)
       (let [db-with-addr (assoc-in app-db [:yggstack :address] "201:me")]
         (reset! rdb/app-db db-with-addr)
         (rf/dispatch-sync [:voip/incoming-signal
                            (assoc msg :sig nil)])
-        (is (= :idle (get-in @rdb/app-db [:voip :call-state])))))
+        (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
+        (is (not (contains? @captured :voip/show-overlay))
+            "should not show overlay for unsigned offer")))
     (testing "offer while busy is ignored"
       (setup)
       (let [db-busy (-> app-db
@@ -167,7 +195,9 @@
                         (assoc-in [:voip :call-state] :connected))]
         (reset! rdb/app-db db-busy)
         (rf/dispatch-sync [:voip/incoming-signal msg])
-        (is (= :connected (get-in @rdb/app-db [:voip :call-state])))))))
+        (is (= :connected (get-in @rdb/app-db [:voip :call-state])))
+        (is (not (contains? @captured :voip/show-overlay))
+            "should not show overlay when busy")))))
 
 (deftest test-incoming-signal-accept
   (let [seed (doto (js/Uint8Array. 32) (aset 0 88))
@@ -196,11 +226,17 @@
         (reset! rdb/app-db db-calling)
         (rf/dispatch-sync [:voip/incoming-signal msg])
         (is (= :connected (get-in @rdb/app-db [:voip :call-state])))
-        (is (contains? @captured :voip/connect-audio))))
+        (is (contains? @captured :voip/connect-audio))
+        (let [overlay (get @captured :voip/show-overlay)]
+          (is (map? overlay) "show-overlay should fire on accept signal")
+          (is (= :active (:mode overlay)))
+          (is (= "201:bbbb::1" (:address overlay))))))
     (testing "accept while idle is ignored"
       (setup)
       (rf/dispatch-sync [:voip/incoming-signal msg])
-      (is (= :idle (get-in @rdb/app-db [:voip :call-state]))))))
+      (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
+      (is (not (contains? @captured :voip/show-overlay))
+          "should not show overlay on unexpected accept"))))
 
 (deftest test-incoming-signal-end
   (let [seed (doto (js/Uint8Array. 32) (aset 0 99))
@@ -225,4 +261,25 @@
                            (assoc-in [:voip :remote-addr] "201:bbbb::1")))
     (rf/dispatch-sync [:voip/incoming-signal msg])
     (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
-    (is (contains? @captured :voip/disconnect-audio))))
+    (is (contains? @captured :voip/disconnect-audio))
+    (is (contains? @captured :voip/hide-overlay)
+        "end signal should hide overlay")))
+
+(deftest test-overlay-cycle
+  (let [contact-id "alice"
+        address "201:aaaa::2"
+        db-ready (-> app-db
+                     (assoc-in [:messenger :contacts contact-id]
+                               {:address address :messages []})
+                     (assoc-in [:yggstack :address] "201:aaaa::1")
+                     (assoc-in [:yggstack :private-key] "privkey")
+                     (assoc-in [:yggstack :public-key] "pubkey"))]
+    (testing "outgoing call shows active overlay"
+      (reset! rdb/app-db db-ready)
+      (rf/dispatch-sync [:voip/call-contact contact-id])
+      (is (= :active (:mode (get @captured :voip/show-overlay)))))
+    (testing "end call hides overlay"
+      (rf/dispatch-sync [:voip/end-call])
+      (is (contains? @captured :voip/hide-overlay)))
+    (testing "after end, overlay was removed from captured state"
+      (is (= :idle (get-in @rdb/app-db [:voip :call-state]))))))
