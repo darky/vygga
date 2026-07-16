@@ -22,6 +22,8 @@ import com.facebook.react.bridge.ReactMethod;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import expo.modules.yggstack.YggdrasilManager;
 
@@ -51,6 +53,8 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
   private volatile boolean udpRunning;
   private String remoteYggIp;
   private int remotePort;
+  private String sessionTokenHex;
+  private byte[] sessionTokenBytes;
 
   AudioTrackModule(ReactApplicationContext context) {
     super(context);
@@ -97,13 +101,15 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
   // ---- UDP Audio ----
 
   @ReactMethod
-  public void initUdpAudio(int localRecvPort, String remoteYggIp, int remotePort, Promise promise) {
+  public void initUdpAudio(int localRecvPort, String remoteYggIp, int remotePort, String sessionToken, Promise promise) {
     try {
       release();
       releaseCodec();
       this.sampleRate = 24000;
       this.remoteYggIp = remoteYggIp;
       this.remotePort = remotePort;
+      this.sessionTokenHex = sessionToken != null ? sessionToken : "";
+      this.sessionTokenBytes = this.sessionTokenHex.getBytes(StandardCharsets.UTF_8);
 
       int channelConfig = AudioFormat.CHANNEL_OUT_MONO;
       int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
@@ -126,7 +132,7 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
         promise.reject("OPUS_DECODER_CREATE_ERROR", "Failed to create Opus decoder");
         return;
       }
-      encodeBuf = new byte[4000];
+      encodeBuf = new byte[4000 + sessionTokenBytes.length];
       decodeBuf = new byte[sampleRate * 2 * 120 / 1000];
 
       int recvPort = localRecvPort > 0 ? localRecvPort : UDP_RECV_PORT;
@@ -148,7 +154,7 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
       startCapture();
 
       Log.d(TAG, "UDP audio initialized: recv=" + recvPort + " send=127.0.0.1:" + sendPort
-            + " -> " + remoteSendAddr);
+            + " -> " + remoteSendAddr + " token=" + sessionTokenHex);
       promise.resolve(true);
     } catch (Exception e) {
       Log.e(TAG, "initUdpAudio error", e);
@@ -187,6 +193,9 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
       releaseCodec();
       release();
 
+      sessionTokenHex = null;
+      sessionTokenBytes = null;
+
       promise.resolve(true);
     } catch (Exception e) {
       Log.e(TAG, "stopUdpAudio error", e);
@@ -195,15 +204,37 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
   }
 
   private void udpReceiveLoop() {
+    int tokenLen = sessionTokenBytes != null ? sessionTokenBytes.length : 0;
     byte[] buf = new byte[4000];
+    byte[] opusBuf = new byte[4000];
     DatagramPacket pkt = new DatagramPacket(buf, buf.length);
     while (udpRunning) {
       try {
         recvSocket.receive(pkt);
-        int pcmLen = OpusBridge.nativeDecoderDecode(
-          opusDecoder, pkt.getData(), pkt.getLength(), decodeBuf);
-        if (pcmLen > 0) {
-          audioTrack.write(decodeBuf, 0, pcmLen);
+        int len = pkt.getLength();
+
+        if (tokenLen > 0 && len <= tokenLen) {
+          Log.w(TAG, "dropping short packet: " + len + " <= token len " + tokenLen);
+          continue;
+        }
+
+        if (tokenLen > 0) {
+          byte[] pktToken = Arrays.copyOfRange(buf, 0, tokenLen);
+          if (!Arrays.equals(pktToken, sessionTokenBytes)) {
+            continue;
+          }
+          System.arraycopy(buf, tokenLen, opusBuf, 0, len - tokenLen);
+          int pcmLen = OpusBridge.nativeDecoderDecode(
+            opusDecoder, opusBuf, len - tokenLen, decodeBuf);
+          if (pcmLen > 0) {
+            audioTrack.write(decodeBuf, 0, pcmLen);
+          }
+        } else {
+          int pcmLen = OpusBridge.nativeDecoderDecode(
+            opusDecoder, buf, len, decodeBuf);
+          if (pcmLen > 0) {
+            audioTrack.write(decodeBuf, 0, pcmLen);
+          }
         }
       } catch (java.net.SocketException e) {
         break;
@@ -243,16 +274,29 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
   }
 
   private void udpCaptureLoop() {
-    byte[] buf = new byte[CAPTURE_BUF_SIZE];
+    int tokenLen = sessionTokenBytes != null ? sessionTokenBytes.length : 0;
+    byte[] pcmBuf = new byte[CAPTURE_BUF_SIZE];
+    byte[] encBuf = new byte[4000];
+    byte[] sendBuf = new byte[4000 + tokenLen];
     while (udpRunning) {
-      int bytesRead = audioCapture.read(buf, 0, buf.length);
+      int bytesRead = audioCapture.read(pcmBuf, 0, pcmBuf.length);
       if (bytesRead <= 0) break;
       int frameSize = bytesRead / 2;
       if (frameSize < 60) continue;
-      int len = OpusBridge.nativeEncoderEncode(opusEncoder, buf, frameSize, encodeBuf);
-      if (len <= 0) continue;
+
+      int opusLen = OpusBridge.nativeEncoderEncode(opusEncoder, pcmBuf, frameSize, encBuf);
+      if (opusLen <= 0) continue;
+
+      if (tokenLen > 0) {
+        System.arraycopy(sessionTokenBytes, 0, sendBuf, 0, tokenLen);
+        System.arraycopy(encBuf, 0, sendBuf, tokenLen, opusLen);
+      } else {
+        System.arraycopy(encBuf, 0, sendBuf, 0, opusLen);
+      }
+
       try {
-        DatagramPacket pkt = new DatagramPacket(encodeBuf, len, sendAddr);
+        int totalLen = tokenLen + opusLen;
+        DatagramPacket pkt = new DatagramPacket(sendBuf, totalLen, sendAddr);
         sendSocket.send(pkt);
       } catch (Exception e) {
         if (udpRunning) Log.w(TAG, "capture send error", e);

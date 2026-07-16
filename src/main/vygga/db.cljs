@@ -23,4 +23,5 @@
                         :call-id nil
                         :remote-addr nil
                         :started-at nil
-                        :audio-seq 0}})
+                        :audio-seq 0
+                        :session-token nil}})

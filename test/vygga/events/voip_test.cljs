@@ -31,7 +31,8 @@
 (deftest test-initial-state
   (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
   (is (nil? (get-in @rdb/app-db [:voip :call-id])))
-  (is (nil? (get-in @rdb/app-db [:voip :remote-addr]))))
+  (is (nil? (get-in @rdb/app-db [:voip :remote-addr])))
+  (is (nil? (get-in @rdb/app-db [:voip :session-token]))))
 
 (deftest test-call-contact-missing-address
   (rf/dispatch-sync [:voip/call-contact "nonexistent"])
@@ -57,7 +58,10 @@
     (let [signal (get @captured :voip/send-signal)]
       (is (map? signal))
       (is (= "offer" (:call-type signal)))
-      (is (= address (:to signal))))
+      (is (= address (:to signal)))
+      (is (string? (:session-token signal)) "offer should contain a session-token"))
+    (is (string? (get-in @rdb/app-db [:voip :session-token]))
+        "session-token should be stored in db")
     (is (not (contains? @captured :voip/connect-audio))
         "should not connect audio before callee accepts")
     (let [overlay (get @captured :voip/show-overlay)]
@@ -84,10 +88,12 @@
         "should not show overlay when busy")))
 
 (deftest test-accept-call-while-ringing
-  (let [db-ringing (-> app-db
+  (let [session-token "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+        db-ringing (-> app-db
                        (assoc-in [:voip :call-state] :ringing)
                        (assoc-in [:voip :call-id] "call-1")
                        (assoc-in [:voip :remote-addr] "201::ring")
+                       (assoc-in [:voip :session-token] session-token)
                        (assoc-in [:yggstack :private-key] "key")
                        (assoc-in [:yggstack :public-key] "pk")
                        (assoc-in [:yggstack :address] "201::me"))]
@@ -96,9 +102,11 @@
     (is (= :connected (get-in @rdb/app-db [:voip :call-state])))
     (let [signal (get @captured :voip/send-signal)]
       (is (map? signal))
-      (is (= "accept" (:call-type signal))))
-    (is (contains? @captured :voip/connect-audio)
-        "accepting call should connect audio for bidirectional communication")
+      (is (= "accept" (:call-type signal)))
+      (is (= session-token (:session-token signal)) "accept should reflect session-token"))
+    (let [audio (get @captured :voip/connect-audio)]
+      (is (map? audio) "accepting call should connect audio")
+      (is (= session-token (:session-token audio)) "connect-audio should receive session-token"))
     (let [overlay (get @captured :voip/show-overlay)]
       (is (map? overlay) "show-overlay should fire on accept")
       (is (= :active (:mode overlay)))
@@ -116,12 +124,15 @@
                        (assoc-in [:voip :call-state] :ringing)
                        (assoc-in [:voip :call-id] "call-1")
                        (assoc-in [:voip :remote-addr] "201::ring")
+                       (assoc-in [:voip :session-token] "tok")
                        (assoc-in [:yggstack :private-key] "key")
                        (assoc-in [:yggstack :public-key] "pk")
                        (assoc-in [:yggstack :address] "201::me"))]
     (reset! rdb/app-db db-ringing)
     (rf/dispatch-sync [:voip/reject-call])
     (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
+    (is (nil? (get-in @rdb/app-db [:voip :session-token]))
+        "session-token should be reset on reject")
     (let [signal (get @captured :voip/send-signal)]
       (is (= "reject" (:call-type signal))))
     (is (contains? @captured :voip/disconnect-audio))
@@ -136,6 +147,7 @@
                            (assoc-in [:voip :call-state] s)
                            (assoc-in [:voip :call-id] "call-1")
                            (assoc-in [:voip :remote-addr] "201::remote")
+                           (assoc-in [:voip :session-token] "tok")
                            (assoc-in [:yggstack :private-key] "key")
                            (assoc-in [:yggstack :public-key] "pk")
                            (assoc-in [:yggstack :address] "201::me"))]
@@ -143,6 +155,8 @@
         (rf/dispatch-sync [:voip/end-call])
         (is (= :idle (get-in @rdb/app-db [:voip :call-state]))
             (str "end from " s " resets to idle"))
+        (is (nil? (get-in @rdb/app-db [:voip :session-token]))
+            (str "end from " s " resets session-token"))
         (is (contains? @captured :voip/send-signal)
             (str "end from " s " sends signal"))
         (is (contains? @captured :voip/disconnect-audio)
@@ -157,7 +171,8 @@
         privkey (apply str (map byte->hex (array-seq (.-secretKey kp))))
         call-id "incoming-call-1"
         ts 1000
-        data-to-sign (str "call-signal|offer|" call-id "|" ts)
+        session-token "deadbeefdeadbeefdeadbeefdeadbeef"
+        data-to-sign (str "call-signal|offer|" call-id "|" ts "|" session-token)
         sig (crypto/sign-message privkey data-to-sign)
         msg {:type "call-signal"
              :call-type "offer"
@@ -166,7 +181,8 @@
              :to "201:me"
              :ts ts
              :pubkey pubkey
-             :sig sig}]
+             :sig sig
+             :session-token session-token}]
     (testing "incoming offer for us"
       (let [db-with-addr (assoc-in app-db [:yggstack :address] "201:me")]
         (reset! rdb/app-db db-with-addr)
@@ -174,6 +190,8 @@
         (is (= :ringing (get-in @rdb/app-db [:voip :call-state])))
         (is (= call-id (get-in @rdb/app-db [:voip :call-id])))
         (is (= "201:aaaa::1" (get-in @rdb/app-db [:voip :remote-addr])))
+        (is (= session-token (get-in @rdb/app-db [:voip :session-token]))
+            "offer should store session-token")
         (let [overlay (get @captured :voip/show-overlay)]
           (is (map? overlay) "show-overlay should fire on incoming offer")
           (is (= :incoming (:mode overlay)))
@@ -186,6 +204,8 @@
         (rf/dispatch-sync [:voip/incoming-signal
                            (assoc msg :sig nil)])
         (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
+        (is (nil? (get-in @rdb/app-db [:voip :session-token]))
+            "unsigned offer should not store session-token")
         (is (not (contains? @captured :voip/show-overlay))
             "should not show overlay for unsigned offer")))
     (testing "offer while busy is ignored"
@@ -196,6 +216,8 @@
         (reset! rdb/app-db db-busy)
         (rf/dispatch-sync [:voip/incoming-signal msg])
         (is (= :connected (get-in @rdb/app-db [:voip :call-state])))
+        (is (nil? (get-in @rdb/app-db [:voip :session-token]))
+            "busy should not store session-token from offer")
         (is (not (contains? @captured :voip/show-overlay))
             "should not show overlay when busy")))))
 
@@ -206,7 +228,8 @@
         privkey (apply str (map byte->hex (array-seq (.-secretKey kp))))
         call-id "my-call"
         ts 2000
-        data-to-sign (str "call-signal|accept|" call-id "|" ts)
+        session-token "aabbccddeeff0011aabbccddeeff0011"
+        data-to-sign (str "call-signal|accept|" call-id "|" ts "|" session-token)
         sig (crypto/sign-message privkey data-to-sign)
         msg {:type "call-signal"
              :call-type "accept"
@@ -215,7 +238,8 @@
              :to "201:me"
              :ts ts
              :pubkey pubkey
-             :sig sig}]
+             :sig sig
+             :session-token session-token}]
     (testing "accept moves calling to connected"
       (let [db-calling (-> app-db
                            (assoc-in [:voip :call-state] :calling)
@@ -226,7 +250,9 @@
         (reset! rdb/app-db db-calling)
         (rf/dispatch-sync [:voip/incoming-signal msg])
         (is (= :connected (get-in @rdb/app-db [:voip :call-state])))
-        (is (contains? @captured :voip/connect-audio))
+        (let [audio (get @captured :voip/connect-audio)]
+          (is (map? audio) "connect-audio should fire on accept signal")
+          (is (= session-token (:session-token audio)) "connect-audio should receive session-token"))
         (let [overlay (get @captured :voip/show-overlay)]
           (is (map? overlay) "show-overlay should fire on accept signal")
           (is (= :active (:mode overlay)))
@@ -245,7 +271,7 @@
         privkey (apply str (map byte->hex (array-seq (.-secretKey kp))))
         call-id "active-call"
         ts 3000
-        data-to-sign (str "call-signal|end|" call-id "|" ts)
+        data-to-sign (str "call-signal|end|" call-id "|" ts "|")
         sig (crypto/sign-message privkey data-to-sign)
         msg {:type "call-signal"
              :call-type "end"
@@ -258,9 +284,12 @@
     (reset! rdb/app-db (-> app-db
                            (assoc-in [:voip :call-state] :connected)
                            (assoc-in [:voip :call-id] call-id)
-                           (assoc-in [:voip :remote-addr] "201:bbbb::1")))
+                           (assoc-in [:voip :remote-addr] "201:bbbb::1")
+                           (assoc-in [:voip :session-token] "tok123")))
     (rf/dispatch-sync [:voip/incoming-signal msg])
     (is (= :idle (get-in @rdb/app-db [:voip :call-state])))
+    (is (nil? (get-in @rdb/app-db [:voip :session-token]))
+        "end signal should reset session-token")
     (is (contains? @captured :voip/disconnect-audio))
     (is (contains? @captured :voip/hide-overlay)
         "end signal should hide overlay")))
