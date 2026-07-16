@@ -177,6 +177,17 @@ public class AudioTrackModule extends ReactContextBaseJavaModule {
         sendSocket = null;
       }
 
+      // Wait for capture and receive threads to fully exit before destroying
+      // codec handles to avoid use-after-free in native encoder/decoder.
+      if (captureThread != null) {
+        try { captureThread.join(500); } catch (InterruptedException ignored) {}
+        captureThread = null;
+      }
+      if (recvThread != null) {
+        try { recvThread.join(500); } catch (InterruptedException ignored) {}
+        recvThread = null;
+      }
+
       String localSend = "127.0.0.1:" + UDP_SEND_PORT;
       String remoteSend = "[" + remoteYggIp + "]:" + remotePort;
       try {
