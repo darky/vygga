@@ -27,6 +27,7 @@
       "./plugins/withAudioTrack",
       "./plugins/withFloatingCallOverlay",
       "./plugins/withWifiLock",
+      "./plugins/withCpuLock",
       "expo-secure-store"
     ],
     "android": {

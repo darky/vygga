@@ -30,8 +30,8 @@
        [:> rn/Text {:style {:font-size 18 :font-weight :bold :margin-bottom 12 :color (:text-primary t)}}
         "Yggdrasil Network"]
        (let [s @status
-              peers @peer-count
-              [color label] (status-label s peers t)]
+             peers @peer-count
+             [color label] (status-label s peers t)]
          [:> rn/View {:style {:flex-direction :row :align-items :center :margin-bottom 8}}
           [:> rn/View {:style {:width 14 :height 14 :border-radius 7
                                :background-color color :margin-right 8}}]

@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -18,6 +19,8 @@ import androidx.core.app.NotificationCompat;
 public class YggdrasilService extends Service {
 
   private static final int FOREGROUND_NOTIFICATION_ID = 9001;
+  private static final int KEEPALIVE_REQUEST_CODE = 9002;
+  private static final long KEEPALIVE_INTERVAL_MS = 600000L;
 
   public static void startYggdrasil(Context context, String configJSON, String socksAddress, String nameserver) throws Exception {
     if (YggdrasilManager.isRunning()) return;
@@ -45,7 +48,17 @@ public class YggdrasilService extends Service {
 
   @Override
   public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
+    if (intent != null && "keepalive".equals(intent.getAction())) {
+      try {
+        YggdrasilManager.retryPeersNow();
+      } catch (Exception e) {
+        Log.w("YggdrasilService", "keepalive retryPeersNow error", e);
+      }
+      scheduleKeepalive();
+      return START_STICKY;
+    }
     startForeground(FOREGROUND_NOTIFICATION_ID, buildForegroundNotification());
+    scheduleKeepalive();
     return START_STICKY;
   }
 
@@ -63,6 +76,7 @@ public class YggdrasilService extends Service {
 
   @Override
   public void onDestroy() {
+    cancelKeepalive();
     YggdrasilManager.stopInternal();
     stopForeground(true);
     super.onDestroy();
@@ -106,5 +120,36 @@ public class YggdrasilService extends Service {
   private int getIconId() {
     int icon = getResources().getIdentifier("ic_launcher", "mipmap", getPackageName());
     return icon != 0 ? icon : android.R.drawable.ic_dialog_info;
+  }
+
+  // ---- Doze keepalive ----
+
+  private void scheduleKeepalive() {
+    Intent intent = new Intent(this, YggdrasilService.class);
+    intent.setAction("keepalive");
+    PendingIntent pi = PendingIntent.getService(this, KEEPALIVE_REQUEST_CODE, intent,
+      PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+    if (alarm == null) return;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      alarm.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+        SystemClock.elapsedRealtime() + KEEPALIVE_INTERVAL_MS, pi);
+    } else {
+      alarm.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+        SystemClock.elapsedRealtime() + KEEPALIVE_INTERVAL_MS, pi);
+    }
+    Log.d("YggdrasilService", "Keepalive scheduled in " + KEEPALIVE_INTERVAL_MS + "ms");
+  }
+
+  private void cancelKeepalive() {
+    Intent intent = new Intent(this, YggdrasilService.class);
+    PendingIntent pi = PendingIntent.getService(this, KEEPALIVE_REQUEST_CODE, intent,
+      PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_NO_CREATE);
+    if (pi != null) {
+      AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+      if (alarm != null) alarm.cancel(pi);
+      pi.cancel();
+      Log.d("YggdrasilService", "Keepalive cancelled");
+    }
   }
 }

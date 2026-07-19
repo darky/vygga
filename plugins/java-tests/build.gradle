@@ -28,7 +28,8 @@ android {
                 '../../plugins/android-yggdrasil',
                 '../../plugins/android-audiotrack',
                 '../../plugins/android-floating-overlay',
-                '../../plugins/android-wifilock'
+                '../../plugins/android-wifilock',
+                '../../plugins/android-cpulock'
             ]
         }
     }

@@ -108,6 +108,7 @@ function withYggstackPermissions(config) {
       'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
       'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
       'android.permission.POST_NOTIFICATIONS',
+      'android.permission.WAKE_LOCK',
     ];
     const existing = perms.map((p) => p.$['android:name']);
     for (const perm of needed) {
