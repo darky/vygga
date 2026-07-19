@@ -21,6 +21,16 @@
       (dotimes [i (.-length original)]
         (is (= (aget original i) (aget roundtripped i)))))))
 
+(deftest test-random-hex
+  (testing "returns hex string of correct length"
+    (let [n 16
+          s (crypto/random-hex n)]
+      (is (string? s))
+      (is (= (* 2 n) (.-length s)))
+      (is (re-find #"^[0-9a-f]+$" s))))
+  (testing "returns different values on successive calls"
+    (is (not= (crypto/random-hex 8) (crypto/random-hex 8)))))
+
 (defn- byte->hex [b]
   (let [s (.toString b 16)]
     (if (= 1 (.-length s)) (str "0" s) s)))

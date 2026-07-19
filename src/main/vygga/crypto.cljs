@@ -43,8 +43,7 @@
 
 (defn random-hex
   [n]
-  (let [bytes (js/Uint8Array. n)]
-    (js/crypto.getRandomValues bytes)
+  (let [bytes (nacl/randomBytes n)]
     (apply str (map (fn [b] (.slice (str "0" (.toString b 16)) -2)) (array-seq bytes)))))
 
 

@@ -39,4 +39,5 @@ if (typeof window !== 'undefined') {
   console.log('Expo/Metro hot reload disabled - shadow-cljs will handle hot reload');
 }
 
+import 'react-native-get-random-values';
 import './app/index.js';
