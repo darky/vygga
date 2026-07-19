@@ -70,17 +70,33 @@
  (fn [{:keys [config-json socks-address nameserver]}]
    (-> (ygg/start config-json socks-address nameserver)
        (.then (fn [_]
-                (js/console.log "Yggdrasil connected")
+                (js/console.log "Yggdrasil daemon started")
                 (rf/dispatch [:yggstack/set-status :running])
+                (let [started-at (js/Date.now)
+                      poll-id (atom nil)]
+                  (reset! poll-id
+                          (js/setInterval
+                           (fn []
+                             (let [elapsed (- (js/Date.now) started-at)]
+                               (-> (ygg/get-peers)
+                                   (.then (fn [json]
+                                            (let [count (.-length (js/JSON.parse json))]
+                                              (rf/dispatch [:yggstack/update-peer-count count])
+                                              (when (and (pos? count) @poll-id)
+                                                (js/clearInterval @poll-id)
+                                                (reset! poll-id nil)
+                                                (js/console.log "Yggdrasil peer connected")))))
+                                   (.catch (fn [_])))
+                               (when (and (>= elapsed 30000) @poll-id)
+                                 (js/clearInterval @poll-id)
+                                 (reset! poll-id nil)
+                                 (js/console.log "Yggdrasil peer poll timeout"))))
+                           5000)))
                 (-> (ygg/get-address)
                     (.then #(rf/dispatch [:yggstack/update-address %]))
                     (.catch (fn [_])))
                 (-> (ygg/get-public-key)
                     (.then #(rf/dispatch [:yggstack/update-public-key %]))
-                    (.catch (fn [_])))
-                (-> (ygg/get-peers)
-                    (.then (fn [json] (rf/dispatch [:yggstack/update-peer-count
-                                                    (.-length (js/JSON.parse json))])))
                     (.catch (fn [_])))))
        (.catch (fn [e]
                  (js/console.error "start error:" e)

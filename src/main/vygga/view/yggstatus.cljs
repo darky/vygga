@@ -7,9 +7,11 @@
             ["expo-clipboard" :as Clipboard]
             ["@expo/vector-icons/Ionicons" :default Ionicons]))
 
-(defn status-label [status t]
+(defn status-label [status peer-count t]
   (case status
-    :running [(:success t) "Connected"]
+    :running (if (pos? peer-count)
+               [(:success t) "Connected"]
+               [(:warning t) "Running"])
     :starting [(:warning t) "Connecting..."]
     :stopping [(:warning t) "Disconnecting..."]
     [(:error t) "Disconnected"]))
@@ -21,8 +23,8 @@
                pref (rf/subscribe [:theme/preferred-scheme])
                t (theme/use-theme @pref)]
     (let [s @status
-          [color label] (status-label s t)
           peers @peer-count
+          [color label] (status-label s peers t)
           addr @address]
       [:> rn/View {:style {:flex-direction :row
                            :align-items :center
