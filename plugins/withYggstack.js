@@ -106,6 +106,7 @@ function withYggstackPermissions(config) {
       'android.permission.ACCESS_NETWORK_STATE',
       'android.permission.FOREGROUND_SERVICE',
       'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
+      'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
       'android.permission.POST_NOTIFICATIONS',
     ];
     const existing = perms.map((p) => p.$['android:name']);
@@ -132,10 +133,16 @@ function withYggstackPermissions(config) {
         services.push({
           $: {
             'android:name': fullServiceName,
-            'android:foregroundServiceType': 'dataSync',
+            'android:foregroundServiceType': 'dataSync|specialUse',
             'android:exported': 'false',
             'android:stopWithTask': 'false',
           },
+          'property': [{
+            $: {
+              'android:name': 'android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE',
+              'android:value': 'foreground_messaging_service',
+            },
+          }],
         });
         appElem['service'] = services;
       }

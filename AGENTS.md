@@ -37,6 +37,22 @@ clj-kondo --lint src/main test
 
 Then run the test suite before submitting any changes.
 
+### Java plugin tests
+
+Android Java plugins in `plugins/android-*` have corresponding unit tests in `plugins/java-tests/`. After any change to a Java plugin source file, run the Java test suite:
+
+```bash
+( cd plugins/java-tests && ./gradlew testDebugUnitTest )
+```
+
+Test mirroring — `plugins/java-tests/src/test/java/expo/modules/` mirrors `plugins/android-*` (e.g. `plugins/android-yggdrasil/` → `expo/modules/yggstack/`). Test classes use the suffix `Test` and are discovered automatically by Gradle.
+
+Test conventions:
+
+1. **JUnit 4 + Robolectric** — tests run under `@RunWith(RobolectricTestRunner.class)` for Android framework shadows (`ShadowService`, `ShadowNotificationManager`). No device needed.
+2. **Mockito** — static util classes (`YggdrasilManager`, `WifiLockManager`) are mocked via `Mockito.mockStatic()`. Verify interactions, not just return values.
+3. **Test lifecycle, not just happy path** — every lifecycle method (`onCreate`, `onStartCommand`, `onDestroy`) needs at least one test. Test edge-cases like `startYggdrasil` when already running.
+
 ## Code Quality
 
 After each finished task, check for shadow-cljs type-inference warnings:

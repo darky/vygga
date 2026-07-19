@@ -98,7 +98,9 @@ public class YggdrasilService extends Service {
       .setPriority(NotificationCompat.PRIORITY_LOW);
     int icon = getIconId();
     if (icon != 0) builder.setSmallIcon(icon);
-    return builder.build();
+    Notification notification = builder.build();
+    notification.flags |= Notification.FLAG_NO_CLEAR;
+    return notification;
   }
 
   private int getIconId() {

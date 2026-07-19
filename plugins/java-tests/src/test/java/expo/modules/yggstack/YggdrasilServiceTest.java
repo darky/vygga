@@ -1,5 +1,6 @@
 package expo.modules.yggstack;
 
+import android.app.Notification;
 import android.content.Context;
 import android.content.Intent;
 
@@ -13,9 +14,11 @@ import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ServiceController;
+import org.robolectric.shadows.ShadowService;
 
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.robolectric.Shadows.shadowOf;
 
 @RunWith(RobolectricTestRunner.class)
 public class YggdrasilServiceTest {
@@ -90,5 +93,15 @@ public class YggdrasilServiceTest {
     public void onBind_returnsNull() {
         controller.create();
         assertNull(service.onBind(new Intent()));
+    }
+
+    @Test
+    public void foregroundNotification_hasNoClearFlag() {
+        controller.create().startCommand(0, 0);
+        ShadowService shadowService = shadowOf(service);
+        Notification notification = shadowService.getLastForegroundNotification();
+        assertNotNull(notification);
+        assertTrue("FLAG_NO_CLEAR must be set", (notification.flags & Notification.FLAG_NO_CLEAR) != 0);
+        assertTrue("FLAG_ONGOING_EVENT must be set", (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0);
     }
 }
