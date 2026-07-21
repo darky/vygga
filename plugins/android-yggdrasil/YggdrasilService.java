@@ -8,8 +8,10 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -20,7 +22,12 @@ public class YggdrasilService extends Service {
 
   private static final int FOREGROUND_NOTIFICATION_ID = 9001;
   private static final int KEEPALIVE_REQUEST_CODE = 9002;
+  private static final int RESTART_REQUEST_CODE = 9003;
   private static final long KEEPALIVE_INTERVAL_MS = 600000L;
+
+  private PowerManager.WakeLock wakeLock;
+  private WifiManager.WifiLock wifiLock;
+  private WifiManager.MulticastLock multicastLock;
 
   public static void startYggdrasil(Context context, String configJSON, String socksAddress, String nameserver) throws Exception {
     if (YggdrasilManager.isRunning()) return;
@@ -57,6 +64,7 @@ public class YggdrasilService extends Service {
       scheduleKeepalive();
       return START_STICKY;
     }
+    acquireLocks();
     startForeground(FOREGROUND_NOTIFICATION_ID, buildForegroundNotification());
     scheduleKeepalive();
     return START_STICKY;
@@ -77,15 +85,122 @@ public class YggdrasilService extends Service {
   @Override
   public void onDestroy() {
     cancelKeepalive();
+    releaseLocks();
     YggdrasilManager.stopInternal();
     stopForeground(true);
     super.onDestroy();
+  }
+
+  @Override
+  public void onTimeout(int startId, int fgsType) {
+    Intent restartIntent = new Intent(this, YggdrasilService.class);
+    restartIntent.setAction("start");
+    PendingIntent pi = PendingIntent.getService(
+      this, RESTART_REQUEST_CODE, restartIntent,
+      PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT);
+    AlarmManager alarm = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+    if (alarm != null) {
+      alarm.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000, pi);
+    }
+    stopSelf();
   }
 
   @Nullable
   @Override
   public IBinder onBind(Intent intent) {
     return null;
+  }
+
+  // ---- Power management ----
+
+  private void acquireLocks() {
+    acquireWakeLock();
+    acquireWifiLock();
+    acquireMulticastLock();
+  }
+
+  private void releaseLocks() {
+    releaseWakeLock();
+    releaseWifiLock();
+    releaseMulticastLock();
+  }
+
+  private void acquireWakeLock() {
+    if (wakeLock != null && wakeLock.isHeld()) return;
+    try {
+      PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+      if (pm != null) {
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "yggdrasil:network");
+        wakeLock.acquire();
+        Log.i("YggdrasilService", "WakeLock acquired");
+      }
+    } catch (Exception e) {
+      Log.e("YggdrasilService", "Failed to acquire WakeLock", e);
+    }
+  }
+
+  private void releaseWakeLock() {
+    try {
+      if (wakeLock != null && wakeLock.isHeld()) {
+        wakeLock.release();
+        Log.i("YggdrasilService", "WakeLock released");
+      }
+    } catch (Exception e) {
+      Log.e("YggdrasilService", "Error releasing WakeLock", e);
+    }
+    wakeLock = null;
+  }
+
+  private void acquireWifiLock() {
+    if (wifiLock != null && wifiLock.isHeld()) return;
+    try {
+      WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+      if (wm != null) {
+        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "yggdrasil:wifi");
+        wifiLock.acquire();
+        Log.i("YggdrasilService", "WifiLock acquired");
+      }
+    } catch (Exception e) {
+      Log.e("YggdrasilService", "Failed to acquire WifiLock", e);
+    }
+  }
+
+  private void releaseWifiLock() {
+    try {
+      if (wifiLock != null && wifiLock.isHeld()) {
+        wifiLock.release();
+        Log.i("YggdrasilService", "WifiLock released");
+      }
+    } catch (Exception e) {
+      Log.e("YggdrasilService", "Error releasing WifiLock", e);
+    }
+    wifiLock = null;
+  }
+
+  private void acquireMulticastLock() {
+    if (multicastLock != null && multicastLock.isHeld()) return;
+    try {
+      WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+      if (wm != null) {
+        multicastLock = wm.createMulticastLock("yggdrasil:multicast");
+        multicastLock.acquire();
+        Log.i("YggdrasilService", "MulticastLock acquired");
+      }
+    } catch (Exception e) {
+      Log.e("YggdrasilService", "Failed to acquire MulticastLock", e);
+    }
+  }
+
+  private void releaseMulticastLock() {
+    try {
+      if (multicastLock != null && multicastLock.isHeld()) {
+        multicastLock.release();
+        Log.i("YggdrasilService", "MulticastLock released");
+      }
+    } catch (Exception e) {
+      Log.e("YggdrasilService", "Error releasing MulticastLock", e);
+    }
+    multicastLock = null;
   }
 
   // ---- Foreground notification ----

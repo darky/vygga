@@ -116,9 +116,7 @@
                            (get-in db [:messenger :server-running]))
                       (conj [:messenger/stop-server]))]
      (cond-> fx
-       (seq dispatches) (assoc :dispatch-n dispatches)
-       (= status :running) (assoc :powermanager/acquire nil)
-       (= status :stopped) (assoc :powermanager/release nil)))))
+       (seq dispatches) (assoc :dispatch-n dispatches)))))
 
 (rf/reg-event-fx
  :yggstack/stop

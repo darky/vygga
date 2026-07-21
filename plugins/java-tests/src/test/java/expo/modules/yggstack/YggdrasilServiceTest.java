@@ -1,8 +1,11 @@
 package expo.modules.yggstack;
 
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.os.PowerManager;
 
 import org.junit.After;
 import org.junit.Before;
@@ -13,7 +16,10 @@ import org.mockito.Mockito;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.Shadows;
 import org.robolectric.android.controller.ServiceController;
+import org.robolectric.shadows.ShadowAlarmManager;
+import org.robolectric.shadows.ShadowPowerManager;
 import org.robolectric.shadows.ShadowService;
 
 import static org.junit.Assert.*;
@@ -103,5 +109,56 @@ public class YggdrasilServiceTest {
         assertNotNull(notification);
         assertTrue("FLAG_NO_CLEAR must be set", (notification.flags & Notification.FLAG_NO_CLEAR) != 0);
         assertTrue("FLAG_ONGOING_EVENT must be set", (notification.flags & Notification.FLAG_ONGOING_EVENT) != 0);
+    }
+
+    @Test
+    public void onStartCommand_acquiresWakeLock() {
+        controller.create().startCommand(0, 0);
+        PowerManager.WakeLock wakeLock = ShadowPowerManager.getLatestWakeLock();
+        assertNotNull("WakeLock should be created", wakeLock);
+        assertTrue("WakeLock should be held after onStartCommand", wakeLock.isHeld());
+    }
+
+    @Test
+    public void onDestroy_releasesWakeLock() {
+        controller.create().startCommand(0, 0);
+        PowerManager.WakeLock wakeLock = ShadowPowerManager.getLatestWakeLock();
+        controller.destroy();
+        assertFalse("WakeLock should be released after onDestroy", wakeLock.isHeld());
+    }
+
+    @Test
+    public void onTimeout_schedulesRestartAlarm() {
+        controller.create().startCommand(0, 0);
+        service.onTimeout(1, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+        AlarmManager alarmMgr = (AlarmManager) RuntimeEnvironment.getApplication()
+            .getSystemService(Context.ALARM_SERVICE);
+        ShadowAlarmManager shadowAlarm = Shadows.shadowOf(alarmMgr);
+        ShadowAlarmManager.ScheduledAlarm nextAlarm = shadowAlarm.peekNextScheduledAlarm();
+        assertNotNull("Restart alarm should be scheduled after onTimeout", nextAlarm);
+        assertNotNull("Restart alarm PendingIntent should not be null", nextAlarm.operation);
+    }
+
+    @Test
+    public void onTimeout_thenOnDestroy_doesNotCancelRestartAlarm() {
+        controller.create().startCommand(0, 0);
+        service.onTimeout(1, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+        controller.destroy();
+        AlarmManager alarmMgr = (AlarmManager) RuntimeEnvironment.getApplication()
+            .getSystemService(Context.ALARM_SERVICE);
+        ShadowAlarmManager shadowAlarm = Shadows.shadowOf(alarmMgr);
+        ShadowAlarmManager.ScheduledAlarm nextAlarm = shadowAlarm.peekNextScheduledAlarm();
+        assertNotNull("Restart alarm should survive onDestroy (different request code)",
+            nextAlarm);
+    }
+
+    @Test
+    public void keepaliveAction_doesNotReacquireLocks() {
+        controller.create().startCommand(0, 0);
+        PowerManager.WakeLock wakeLock = ShadowPowerManager.getLatestWakeLock();
+        Intent keepaliveIntent = new Intent(service, YggdrasilService.class);
+        keepaliveIntent.setAction("keepalive");
+        service.onStartCommand(keepaliveIntent, 0, 0);
+        assertTrue("WakeLock should still be held after keepalive", wakeLock.isHeld());
     }
 }
